@@ -1,0 +1,75 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+}
+
+group = 'com.example.auditor'
+version = '1.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'info.picocli:picocli:4.7.6'
+    implementation 'com.google.code.gson:gson:2.8.9'
+    implementation 'org.apache.commons:commons-lang3:3.12.0'
+}
+
+application {
+    mainClass = 'com.example.auditor.ProjectAuditor'
+
+    run {
+        systemProperty "file.encoding", "UTF-8"
+        systemProperty "sun.stdout.encoding", "UTF-8"
+        systemProperty "sun.stderr.encoding", "UTF-8"
+        standardInput = System.in
+        if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+            environment "JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8"
+        }
+    }
+}
+
+// Настройка shadowJar
+shadowJar {
+    archiveClassifier = ''
+    archiveBaseName = "project-auditor"
+    manifest {
+        attributes 'Main-Class': 'com.example.auditor.ProjectAuditor'
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(JavaExec).configureEach {
+    systemProperty 'file.encoding', 'UTF-8'
+    systemProperty 'sun.stdout.encoding', 'UTF-8'
+    systemProperty 'sun.stderr.encoding', 'UTF-8'
+}
+
+// ПОЛНОСТЬЮ ОТКЛЮЧАЕМ КОНФЛИКТУЮЩИЕ ЗАДАЧИ
+// Отключаем задачи плагина application
+tasks.named('startScripts').configure { enabled = false }
+tasks.named('distZip').configure { enabled = false }
+tasks.named('distTar').configure { enabled = false }
+
+// Отключаем задачи плагина shadow
+tasks.named('shadowDistZip').configure { enabled = false }
+tasks.named('shadowDistTar').configure { enabled = false }
+tasks.named('startShadowScripts').configure { enabled = false }
+
+// Создаем задачу для копирования с нужным именем
+task copyFinalJar(type: Copy) {
+    dependsOn shadowJar
+    from shadowJar.archiveFile
+    into "$buildDir/libs"
+    rename { "project-auditor.jar" }
+}
+
+// Зависимости для сборки
+tasks.named('build').configure {
+    dependsOn copyFinalJar
+}
