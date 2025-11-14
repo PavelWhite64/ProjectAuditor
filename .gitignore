@@ -1,42 +1,130 @@
-.gradle
+# 🚫 Build outputs
 build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
+out/
+target/
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
 
-### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
+# 🚫 Gradle
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# 🚫 IDE
+.idea/
 *.iws
 *.iml
 *.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
+.idea_modules/
 
-### Eclipse ###
-.apt_generated
+# 🚫 Eclipse
 .classpath
-.factorypath
 .project
-.settings
-.springBeans
-.sts4-cache
+.settings/
 bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
 
-### NetBeans ###
+# 🚫 NetBeans
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
+# 🚫 VS Code
 .vscode/
+*.code-workspace
 
-### Mac OS ###
+# 🚫 OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 🚫 Logs
+*.log
+logs/
+
+# 🚫 Dependency caches
+.cache/
+
+# 🚫 Temporary files
+*.tmp
+*.temp
+.tmp/
+
+# 🚫 Environment files
+.env
+.env.local
+.env.production
+
+# 🚫 System files
+*.swp
+*.swo
+*~
+
+# 🚫 Coverage reports
+coverage/
+*.lcov
+*.coverage
+
+# 🚫 Package files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.rar
+
+# 🚫 Backup files
+*.bak
+*.backup
+
+# 🚫 Local configuration
+local.properties
+local.yml
+local.yaml
+
+# 🚫 MacOS
+*.DS_Store?
+.AppleDouble
+.LSOverride
+
+# 🚫 Windows
+[Tt]humbs.db
+$RECYCLE.BIN/
+Desktop.ini
+
+# 🚫 Linux
+*~
+
+# 🚫 Package Files (for various package managers)
+*.jar.original
+
+# 🚫 Application specific
+/config/application-local.yml
+/config/application-dev.yml
+
+# 🚫 Gradle Wrapper (we keep the jar but exclude other gradle files)
+!gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.properties
+
+# 🚫 Exclude but keep source build directories
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# 🚫 Exclude but keep source out directories
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# 🚫 Exclude but keep source bin directories
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# 🚫 Custom project exclusions
+/audit-reports/
+/temp/
+/backup/
