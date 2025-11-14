@@ -1,75 +1,92 @@
+// build.gradle
+// Применяем необходимые плагины
 plugins {
-    id 'java'
-    id 'application'
-    id 'com.github.johnrengelman.shadow' version '7.1.2'
+    id 'java' // Поддержка Java
+    id 'application' // Плагин для создания исполняемого приложения
+    id 'com.github.johnrengelman.shadow' version '8.1.1' // Плагин для создания "толстого" JAR (включает все зависимости)
 }
 
-group = 'com.example.auditor'
+// Основная информация о проекте
+group = 'com.example'
 version = '1.0'
+sourceCompatibility = JavaVersion.VERSION_17 // Указываем версию Java (17)
 
+// Репозитории, откуда Gradle будет скачивать зависимости
 repositories {
-    mavenCentral()
+    mavenCentral() // Основной репозиторий Maven
 }
 
+// Зависимости проекта (остаётся пустым для этого проекта)
 dependencies {
-    implementation 'info.picocli:picocli:4.7.6'
-    implementation 'com.google.code.gson:gson:2.8.9'
-    implementation 'org.apache.commons:commons-lang3:3.12.0'
+    // Пример зависимости (JUnit для тестов, обычно в testCompileOnly или testImplementation)
+    // testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
+    // testCompileOnly 'org.junit.jupiter:junit-jupiter-api:5.9.2'
+    // testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
+    // Для этого проекта зависимости, видимо, не требуются, так как он использует стандартные библиотеки Java
+    // и встроенные утилиты. Оставляем пустым или комментируем пример.
 }
 
+// Настройки тестирования (если есть тесты)
+test {
+    useJUnitPlatform() // Использовать JUnit Platform для запуска тестов
+}
+
+// Настройки приложения (для задачи 'run')
 application {
-    mainClass = 'com.example.auditor.ProjectAuditor'
-
-    run {
-        systemProperty "file.encoding", "UTF-8"
-        systemProperty "sun.stdout.encoding", "UTF-8"
-        systemProperty "sun.stderr.encoding", "UTF-8"
-        standardInput = System.in
-        if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
-            environment "JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8"
-        }
-    }
+    // УКАЗЫВАЕМ НОВЫЙ mainClass
+    mainClass = 'com.example.auditor.Main'
+    // Если вы используете старый стиль, можно указать так:
+    // mainClassName = 'com.example.auditor.Main' // (устаревшее, но работает)
 }
 
-// Настройка shadowJar
-shadowJar {
-    archiveClassifier = ''
-    archiveBaseName = "project-auditor"
-    manifest {
-        attributes 'Main-Class': 'com.example.auditor.ProjectAuditor'
-    }
-}
+// Настройки задачи 'run' (КЛЮЧЕВОЙ БЛОК)
+run {
+    // Убедитесь, что стандартный ввод передается
+    standardInput = System.in
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
-
-tasks.withType(JavaExec).configureEach {
+    // Установка системных свойств для кодировки (может помочь)
     systemProperty 'file.encoding', 'UTF-8'
     systemProperty 'sun.stdout.encoding', 'UTF-8'
     systemProperty 'sun.stderr.encoding', 'UTF-8'
+
+    // (Опционально) Аргументы командной строки, если нужно передать что-то
+    // args 'arg1', 'arg2'
 }
 
-// ПОЛНОСТЬЮ ОТКЛЮЧАЕМ КОНФЛИКТУЮЩИЕ ЗАДАЧИ
-// Отключаем задачи плагина application
-tasks.named('startScripts').configure { enabled = false }
-tasks.named('distZip').configure { enabled = false }
-tasks.named('distTar').configure { enabled = false }
-
-// Отключаем задачи плагина shadow
-tasks.named('shadowDistZip').configure { enabled = false }
-tasks.named('shadowDistTar').configure { enabled = false }
-tasks.named('startShadowScripts').configure { enabled = false }
-
-// Создаем задачу для копирования с нужным именем
-task copyFinalJar(type: Copy) {
-    dependsOn shadowJar
-    from shadowJar.archiveFile
-    into "$buildDir/libs"
-    rename { "project-auditor.jar" }
+// Настройки плагина ShadowJar (для создания толстого JAR)
+shadowJar {
+    // Артефакт будет называться project-auditor-1.0-all.jar или подобным
+    // archiveBaseName.set('project-auditor') // Можно изменить имя, если хочется
+    // archiveClassifier.set('all') // Классификатор по умолчанию 'all'
+    // archiveVersion.set('') // Можно убрать версию из имени JAR
+    manifest {
+        attributes(
+                'Main-Class': 'com.example.auditor.Main', // Указываем Main-Class в манифесте JAR
+                'Multi-Release': 'true' // Полезно для мульти-релизных JAR, если используется
+        )
+    }
 }
 
-// Зависимости для сборки
-tasks.named('build').configure {
-    dependsOn copyFinalJar
+// Задача по умолчанию (опционально)
+defaultTasks 'clean', 'build'
+
+// Дополнительные настройки компиляции (если нужно)
+compileJava {
+    options.encoding = 'UTF-8' // Устанавливаем кодировку исходников
+    // options.compilerArgs << '-Xlint:unchecked' // Включить определенные предупреждения компилятора
 }
+
+// Убедимся, что задача shadowJar зависит от build
+build.dependsOn shadowJar
+
+// --- Оригинальные фрагменты из v2.md (для справки, не активны как настройки) ---
+// [SCRIPT] gradlew.bat
+// [DOC] README.md
+// ...
+// application {
+//     mainClass = 'com.example.auditor.ProjectAuditor' // <-- Было здесь
+// }
+// ...
+// ./gradlew run
+// ...
+// java -Dfile.encoding=UTF-8 -jar build/libs/project-auditor.jar

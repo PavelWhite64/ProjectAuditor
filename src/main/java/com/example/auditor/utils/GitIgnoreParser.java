@@ -1,4 +1,4 @@
-package com.example.auditor;
+package com.example.auditor.utils;
 
 import java.io.IOException;
 import java.nio.file.Files;
