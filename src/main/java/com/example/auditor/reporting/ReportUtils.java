@@ -3,6 +3,7 @@ package com.example.auditor.reporting;
 import com.example.auditor.model.FileInfo;
 import com.example.auditor.utils.FileIcon;
 
+import com.example.auditor.utils.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,24 +25,7 @@ public class ReportUtils {
 
     // --- НОВЫЙ МЕТОД: Проверка, находится ли путь внутри базового каталога ---
     public static boolean isPathInsideBaseDirectory(Path filePath, Path baseDirectoryPath) {
-        try {
-            // Получаем нормализованные абсолютные пути
-            Path normalizedFilePath = filePath.normalize().toAbsolutePath();
-            Path normalizedBasePath = baseDirectoryPath.normalize().toAbsolutePath();
-
-            // Relativize пути
-            Path relativePath = normalizedBasePath.relativize(normalizedFilePath);
-
-            // Если relativize возвращает путь, начинающийся с "..", значит filePath вне baseDirectory
-            // relativize возвращает пустой путь, если filePath == baseDirectory
-            // relativize возвращает путь внутри, если filePath внутри baseDirectory
-            // Проверяем только начало результата.
-            return !relativePath.toString().startsWith("..");
-        } catch (IllegalArgumentException e) {
-            // relativize может выбросить IllegalArgumentException, если пути несовместимы (например, разные диски в Windows)
-            LOGGER.warn("Не удалось определить, находится ли файл '{}' внутри базовой директории '{}': {}", filePath, baseDirectoryPath, e.getMessage());
-            return false; // В случае ошибки считаем, что путь не внутри (для безопасности)
-        }
+        return SecurityUtils.isPathInsideBaseDirectory(filePath, baseDirectoryPath);
     }
     // --- /НОВЫЙ МЕТОД ---
 
