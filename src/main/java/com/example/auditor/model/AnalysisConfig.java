@@ -5,6 +5,7 @@ import java.util.List;
 
 /**
  * Класс для хранения конфигурации анализа проекта.
+ * Добавлены ограничения для обработки больших файлов.
  */
 public class AnalysisConfig {
     private final Path projectPath;
@@ -13,14 +14,30 @@ public class AnalysisConfig {
     private final boolean generateJsonMetadata;
     private final boolean openResultsAfterwards;
     private final boolean useGitIgnore;
-    private final long maxFileSizeKB; // Максимальный размер файла в KB
-    private final List<String> excludedPatterns; // Паттерны исключения (из .gitignore и других)
-    private final boolean lightMode; // Режим "только структура"
+    private final long maxFileSizeKB; // Максимальный размер файла в KB для фильтрации
+    private final List<String> excludedPatterns;
+    private final boolean lightMode;
+
+    // Новые поля для ограничения обработки больших файлов
+    private final long maxContentSizeBytes; // Максимальный размер содержимого для чтения (в байтах)
+    private final int maxLinesPerFile;      // Максимальное количество строк для чтения
 
     // Конструктор с всеми параметрами
     public AnalysisConfig(Path projectPath, OutputFormat outputFormat, String outputFileName,
                           boolean generateJsonMetadata, boolean openResultsAfterwards,
-                          boolean useGitIgnore, long maxFileSizeKB, List<String> excludedPatterns, boolean lightMode) {
+                          boolean useGitIgnore, long maxFileSizeKB, List<String> excludedPatterns,
+                          boolean lightMode) {
+        this(projectPath, outputFormat, outputFileName, generateJsonMetadata, openResultsAfterwards,
+                useGitIgnore, maxFileSizeKB, excludedPatterns, lightMode,
+                50 * 1024 * 1024, // 50MB по умолчанию для содержимого
+                5000); // 5000 строк по умолчанию
+    }
+
+    // Новый конструктор с ограничениями содержимого
+    public AnalysisConfig(Path projectPath, OutputFormat outputFormat, String outputFileName,
+                          boolean generateJsonMetadata, boolean openResultsAfterwards,
+                          boolean useGitIgnore, long maxFileSizeKB, List<String> excludedPatterns,
+                          boolean lightMode, long maxContentSizeBytes, int maxLinesPerFile) {
         this.projectPath = projectPath;
         this.outputFormat = outputFormat;
         this.outputFileName = outputFileName;
@@ -30,6 +47,8 @@ public class AnalysisConfig {
         this.maxFileSizeKB = maxFileSizeKB;
         this.excludedPatterns = excludedPatterns != null ? excludedPatterns : List.of();
         this.lightMode = lightMode;
+        this.maxContentSizeBytes = maxContentSizeBytes;
+        this.maxLinesPerFile = maxLinesPerFile;
     }
 
     // Геттеры
@@ -69,11 +88,20 @@ public class AnalysisConfig {
         return lightMode;
     }
 
+    // Новые геттеры для ограничений содержимого
+    public long getMaxContentSizeBytes() {
+        return maxContentSizeBytes;
+    }
+
+    public int getMaxLinesPerFile() {
+        return maxLinesPerFile;
+    }
+
     // Вспомогательный enum для формата вывода
     public enum OutputFormat {
         MARKDOWN,
         HTML,
         BOTH,
-        STRUCTURE_ONLY // Соответствует "Только структура"
+        STRUCTURE_ONLY
     }
 }

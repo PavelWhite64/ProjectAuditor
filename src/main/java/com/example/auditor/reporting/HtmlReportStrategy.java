@@ -41,7 +41,12 @@ public class HtmlReportStrategy implements ReportStrategy {
         boolean lightMode = config.isLightMode();
         Path projectPath = config.getProjectPath();
 
-        htmlGenerator.generate(files, projectName, projectType, lightMode, projectPath, htmlFile);
+        // Получаем ограничения из конфигурации
+        long maxContentSizeBytes = config.getMaxContentSizeBytes();
+        int maxLinesPerFile = config.getMaxLinesPerFile();
+
+        htmlGenerator.generate(files, projectName, projectType, lightMode, projectPath, htmlFile,
+                maxContentSizeBytes, maxLinesPerFile);
     }
 
     @Override

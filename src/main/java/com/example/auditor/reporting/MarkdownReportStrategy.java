@@ -8,15 +8,8 @@ import com.example.auditor.model.FileInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedWriter;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Стратегия генерации Markdown отчетов
@@ -49,7 +42,12 @@ public class MarkdownReportStrategy implements ReportStrategy {
         boolean lightMode = config.isLightMode();
         Path projectPath = config.getProjectPath();
 
-        markdownGenerator.generate(files, projectName, projectType, lightMode, projectPath, markdownFile);
+        // Получаем ограничения из конфигурации
+        long maxContentSizeBytes = config.getMaxContentSizeBytes();
+        int maxLinesPerFile = config.getMaxLinesPerFile();
+
+        markdownGenerator.generate(files, projectName, projectType, lightMode, projectPath, markdownFile,
+                maxContentSizeBytes, maxLinesPerFile);
     }
 
     @Override

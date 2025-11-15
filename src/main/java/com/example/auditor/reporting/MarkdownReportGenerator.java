@@ -12,6 +12,7 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -25,8 +26,9 @@ public class MarkdownReportGenerator {
         this.fileIconService = fileIconService;
     }
 
-    // Метод generate теперь принимает Path projectPath
-    public void generate(List<FileInfo> files, String projectName, String projectType, boolean lightMode, Path projectPath, String outputFile) {
+    // Метод generate теперь принимает ограничения для чтения файлов
+    public void generate(List<FileInfo> files, String projectName, String projectType, boolean lightMode,
+                         Path projectPath, String outputFile, long maxContentSizeBytes, int maxLinesPerFile) {
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), StandardCharsets.UTF_8))) {
             String currentDate = ReportUtils.getCurrentDate();
             long totalSizeKB = files.stream().mapToLong(FileInfo::getLength).sum() / 1024;
@@ -37,7 +39,8 @@ public class MarkdownReportGenerator {
             writer.write("**Файлов включено:** " + totalFiles + "\n");
             writer.write("**Общий размер:** " + totalSizeKB + " KB\n");
             writer.write("**Тип проекта:** " + ReportUtils.escapeMarkdown(projectType) + "\n");
-            writer.write("**Режим:** " + (lightMode ? "Light" : "Full") + "\n\n");
+            writer.write("**Режим:** " + (lightMode ? "Light" : "Full") + "\n");
+            writer.write("**Ограничения:** Макс. размер содержимого: " + (maxContentSizeBytes / 1024 / 1024) + " MB, Макс. строк: " + maxLinesPerFile + "\n\n");
 
             // Статистика
             writer.write("## Статистика проекта\n\n");
@@ -63,17 +66,23 @@ public class MarkdownReportGenerator {
                     String icon = fileIconService.getIcon(file.getExtension());
                     String language = fileIconService.getLanguage(file.getExtension());
                     double kb = file.getLength() / 1024.0;
+
                     String warning = "";
-                    if (kb > 50) {
-                        warning = "  > **Примечание:** Файл большого размера (" + String.format("%.0f", kb) + " KB). LLM может пропустить часть контента.\n\n";
+                    if (file.getLength() > maxContentSizeBytes) {
+                        warning = "  > **Примечание:** Файл слишком большой (" + String.format(Locale.US, "%.1f", kb) + " KB). Содержимое не будет прочитано полностью.\n\n";
+                    } else if (kb > 50) {
+                        warning = "  > **Примечание:** Файл большого размера (" + String.format(Locale.US, "%.1f", kb) + " KB). Может быть обрезан.\n\n";
                     }
-                    writer.write("\n" + warning + "### " + icon + " " + escapeMarkdown(file.getRelativePath()) + " (`" + String.format("%.1f", kb) + " KB`)\n");
+
+                    writer.write("\n" + warning + "### " + icon + " " + escapeMarkdown(file.getRelativePath()) + " (`" + String.format(Locale.US, "%.1f", kb) + " KB`)\n");
                     writer.write("```" + language + "\n");
                     try {
-                        String content = ReportUtils.readFileContent(file.getFullName(), projectPath);
+                        // Используем ограничения при чтении содержимого файла
+                        String content = ReportUtils.readFileContent(file.getFullName(), projectPath, maxContentSizeBytes, maxLinesPerFile);
                         writer.write(content.trim() + "\n");
                     } catch (IOException e) {
-                        writer.write(" <!-- Ошибка чтения файла -->\n");
+                        writer.write("<!-- Ошибка чтения файла: " + e.getMessage() + " -->\n");
+                        LOGGER.error("Ошибка чтения файла {}: {}", file.getRelativePath(), e.getMessage());
                     }
                     writer.write("```\n");
                 }
@@ -86,6 +95,7 @@ public class MarkdownReportGenerator {
             writer.write("- **Общий размер:** " + totalSizeKB + " KB\n");
             writer.write("- **Тип проекта:** " + ReportUtils.escapeMarkdown(projectType) + "\n");
             writer.write("- **Режим:** " + (lightMode ? "Light" : "Full") + "\n");
+            writer.write("- **Ограничения чтения:** " + (maxContentSizeBytes / 1024 / 1024) + " MB, " + maxLinesPerFile + " строк\n");
             writer.write("- **Сгенерировано:** " + currentDate + "\n");
             writer.write("  > Проект **" + ReportUtils.escapeMarkdown(projectName) + "** готов для анализа LLM.\n");
             writer.write("  > ВАЖНО: Сфокусируйся на критических проблемах безопасности!\n");

@@ -6,6 +6,7 @@ import com.example.auditor.utils.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -58,16 +59,55 @@ public class ReportUtils {
                 .replace("\t", "\\t");
     }
 
-    // --- Метод для чтения содержимого файла (с безопасностью) ---
-    public static String readFileContent(Path filePath, Path baseDirectoryPath) throws IOException {
+    // --- Улучшенный метод для чтения содержимого файла с ограничениями ---
+    public static String readFileContent(Path filePath, Path baseDirectoryPath,
+                                         long maxContentSizeBytes, int maxLinesPerFile) throws IOException {
         // Проверяем, находится ли файл внутри разрешённой директории
         if (!isPathInsideBaseDirectory(filePath, baseDirectoryPath)) {
             LOGGER.warn("Попытка чтения файла за пределами базовой директории: {}. Файл будет пропущен.", filePath);
-            return ""; // Возвращаем пустую строку, если путь вне разрешённой области
+            return "<!-- SECURITY: File outside base directory -->";
         }
 
-        // Если проверка пройдена, читаем файл
-        return Files.readString(filePath, StandardCharsets.UTF_8);
+        // Проверяем размер файла
+        long fileSize = Files.size(filePath);
+        if (fileSize > maxContentSizeBytes) {
+            LOGGER.info("Файл слишком большой для полного чтения: {} ({} bytes)", filePath, fileSize);
+            return String.format("<!-- FILE TOO LARGE: %d bytes (limit: %d bytes) -->\n" +
+                            "// Content truncated due to size limitations",
+                    fileSize, maxContentSizeBytes);
+        }
+
+        // Если файл пустой
+        if (fileSize == 0) {
+            return "<!-- EMPTY FILE -->";
+        }
+
+        // Читаем файл с ограничением по количеству строк
+        return readFileWithLineLimit(filePath, maxLinesPerFile);
+    }
+
+    // --- Метод для чтения файла с ограничением строк ---
+    private static String readFileWithLineLimit(Path filePath, int maxLines) throws IOException {
+        StringBuilder content = new StringBuilder();
+        int lineCount = 0;
+
+        try (BufferedReader reader = Files.newBufferedReader(filePath, StandardCharsets.UTF_8)) {
+            String line;
+            while ((line = reader.readLine()) != null && lineCount < maxLines) {
+                content.append(line).append("\n");
+                lineCount++;
+            }
+
+            // Добавляем сообщение если файл был обрезан
+            if (line != null) {
+                content.append(String.format("\n<!-- CONTENT TRUNCATED: Read %d lines (limit: %d lines) -->",
+                        lineCount, maxLines));
+                LOGGER.debug("Файл обрезан: {} (прочитано {} строк из лимита {})",
+                        filePath, lineCount, maxLines);
+            }
+        }
+
+        return content.toString().trim();
     }
 
     // --- Метод для генерации дерева файлов в формате Markdown ---
