@@ -1,10 +1,11 @@
-// src/main/java/com/example/auditor/analysis/FileScannerImpl.java
 package com.example.auditor.analysis;
 
+import com.example.auditor.core.FileTypeClassifier;
 import com.example.auditor.core.ProjectScanner;
 import com.example.auditor.model.FileInfo;
-import com.example.auditor.utils.ProgressBar;
-import com.example.auditor.utils.FileTypeClassifier;
+import com.example.auditor.utils.ConsoleProgressIndicator;
+import com.example.auditor.utils.FileExtensionUtils;
+import com.example.auditor.utils.SecurityUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -28,39 +29,53 @@ public class FileScannerImpl implements ProjectScanner {
     private static volatile Set<String> ignoredDirectories = null;
     private static final Object lock = new Object(); // Объект для синхронизации
 
+    private final FileTypeClassifier fileTypeClassifier;
+
+    public FileScannerImpl(FileTypeClassifier fileTypeClassifier) {
+        this.fileTypeClassifier = fileTypeClassifier;
+    }
+
     @Override
     public List<FileInfo> scan(Path projectPath) throws IOException {
         List<FileInfo> files = new ArrayList<>();
 
         // Прогресс-бар инициализируется, но обновляется только при фактическом добавлении файлов
-        ProgressBar progressBar = new ProgressBar("Сканирование файлов", 100); // Временно 100 или 0, т.к. точное кол-во неизвестно
-        AtomicInteger processed = new AtomicInteger(0); // Используем AtomicInteger
+        ConsoleProgressIndicator progressBar = new ConsoleProgressIndicator("Сканирование файлов", 100);
+        AtomicInteger processed = new AtomicInteger(0);
 
         // Используем SimpleFileVisitor для обхода дерева файлов
         Files.walkFileTree(projectPath, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                // Проверяем безопасность директории
+                if (!SecurityUtils.isSafeDirectory(dir, projectPath)) {
+                    LOGGER.warn("Пропуск небезопасной директории: {}", dir);
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+
                 // Получаем имя директории
                 String dirName = dir.getFileName().toString();
 
                 // Проверяем, нужно ли игнорировать эту директорию
-                // Получаем список игнорируемых директорий (загружается при первом обращении)
                 Set<String> ignoredDirs = getIgnoredDirectories();
                 if (ignoredDirs.contains(dirName)) {
-                    LOGGER.debug("Пропуск подкаталога: {}", dir);
-                    return FileVisitResult.SKIP_SUBTREE; // Пропускаем всю поддиректорию
+                    LOGGER.debug("Пропуск игнорируемого каталога: {}", dir);
+                    return FileVisitResult.SKIP_SUBTREE;
                 }
 
-                // Обрабатываем директорию (например, для прогресс-бара, если нужно)
-                // progressBar.update(processed.incrementAndGet()); // Не обновляем прогресс для директорий
                 return FileVisitResult.CONTINUE;
             }
 
             @Override
             public FileVisitResult visitFile(Path filePath, BasicFileAttributes attrs) throws IOException {
+                // Проверяем безопасность файла
+                if (!SecurityUtils.isSafePath(filePath, projectPath)) {
+                    LOGGER.warn("Пропуск небезопасного файла: {}", filePath);
+                    return FileVisitResult.CONTINUE;
+                }
+
                 if (Files.isRegularFile(filePath)) {
                     try {
-                        // --- ОТЛАДКА ---
                         String relativePath = projectPath.relativize(filePath).toString().replace('\\', '/');
                         LOGGER.debug("Scanning file - Full: {}, Relative: {}", filePath, relativePath);
 
@@ -69,38 +84,29 @@ public class FileScannerImpl implements ProjectScanner {
                                 filePath.getFileName().toString(),
                                 relativePath,
                                 attrs.size(),
-                                getFileExtension(filePath.getFileName().toString()),
-                                FileTypeClassifier.classify(filePath.getFileName().toString()) // Используем классификатор
+                                FileExtensionUtils.getExtension(filePath.getFileName().toString(),
+                                        FileExtensionUtils.ExtensionFormat.WITHOUT_DOT),
+                                fileTypeClassifier.classify(filePath.getFileName().toString()) // Используем инжектированный классификатор
                         );
                         files.add(fileInfo);
-                    } catch (Exception e) { // Ловим Exception, включая IOException от FileTypeClassifier
-                        LOGGER.error("Ошибка при обработке файла {}: {}", filePath, e.getMessage(), e); // Логируем ошибку с трейсом
-                        // Продолжаем сканирование остальных файлов
+                    } catch (Exception e) {
+                        LOGGER.error("Ошибка при обработке файла {}: {}", filePath, e.getMessage(), e);
                     } finally {
-                        // Обновляем прогресс-бар В ЛЮБОМ СЛУЧАЕ после попытки обработать файл
-                        progressBar.update(processed.incrementAndGet()); // Используем метод incrementAndGet()
+                        progressBar.update(processed.incrementAndGet());
                     }
-                } else {
-                    // Если файл не regular (например, символическая ссылка, FIFO и т.д.)
-                    // всё равно обновляем прогресс, так как он был учтён в Files.walk().count()
-                    // НЕТ, в данном случае мы не знаем общее количество файлов, так как Files.walk не используется.
-                    // Прогресс-бар обновляется только при добавлении регулярных файлов.
-                    // progressBar.update(processed.incrementAndGet());
                 }
                 return FileVisitResult.CONTINUE;
             }
 
             @Override
             public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-                // Игнорируем ошибки доступа к отдельным файлам/каталогам
-                LOGGER.warn("Ошибка доступа к файлу/каталогу: {} ({})", file, exc.getMessage()); // Используем warn для предупреждений
-                // Прогресс-бар обновляется только при обработке регулярных файлов
-                // progressBar.update(processed.incrementAndGet());
+                LOGGER.warn("Ошибка доступа к файлу/каталогу: {} ({})", file, exc.getMessage());
                 return FileVisitResult.CONTINUE;
             }
         });
 
         progressBar.finish();
+        LOGGER.info("Сканирование завершено. Найдено {} файлов.", files.size());
         return files;
     }
 
@@ -128,36 +134,24 @@ public class FileScannerImpl implements ProjectScanner {
 
             if (ignoredDirsNode == null || !ignoredDirsNode.isArray()) {
                 LOGGER.error("Неверный формат JSON в ресурсе {}: отсутствует массив 'ignoredDirectories'", resourcePath);
-                return Collections.emptySet(); // Возвращаем пустой сет в случае ошибки
+                return Collections.emptySet();
             }
 
-            // --- ИСПРАВЛЕНИЕ: Используем цикл for-each ---
             java.util.Set<String> set = new java.util.HashSet<>();
             for (JsonNode node : ignoredDirsNode) {
-                // Убедимся, что элемент массива - строка
                 if (node != null && node.isValueNode()) {
                     set.add(node.asText());
                 } else {
                     LOGGER.warn("Найден нестроковый элемент в массиве 'ignoredDirectories': {}. Пропущен.", node);
                 }
             }
-            // --- /ИСПРАВЛЕНИЕ ---
 
             LOGGER.debug("Загружено {} игнорируемых директорий из {}", set.size(), resourcePath);
             return set;
 
         } catch (IOException e) {
             LOGGER.error("Ошибка при загрузке игнорируемых директорий из {}: {}", resourcePath, e.getMessage(), e);
-            return Collections.emptySet(); // Возвращаем пустой сет в случае ошибки
+            return Collections.emptySet();
         }
-    }
-
-
-    private String getFileExtension(String fileName) {
-        int lastDotIndex = fileName.lastIndexOf('.');
-        if (lastDotIndex > 0 && lastDotIndex < fileName.length() - 1) {
-            return fileName.substring(lastDotIndex + 1); // Без точки
-        }
-        return null; // или " "
     }
 }

@@ -1,8 +1,8 @@
 package com.example.auditor.reporting;
 
+import com.example.auditor.core.FileIconService;
 import com.example.auditor.model.AnalysisResult;
 import com.example.auditor.model.FileInfo;
-import com.example.auditor.utils.FileIcon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +18,12 @@ import java.util.stream.Collectors;
 public class JsonMetadataGenerator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JsonMetadataGenerator.class);
+
+    private final FileIconService fileIconService;
+
+    public JsonMetadataGenerator(FileIconService fileIconService) {
+        this.fileIconService = fileIconService;
+    }
 
     public void generate(AnalysisResult result, String outputFile) {
         try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(outputFile), StandardCharsets.UTF_8))) {
@@ -50,7 +56,7 @@ public class JsonMetadataGenerator {
                 writer.write("      \"path\": \"" + ReportUtils.escapeJson(file.getRelativePath()) + "\",\n");
                 writer.write("      \"sizeKB\": " + (file.getLength() / 1024) + ",\n");
                 writer.write("      \"language\": \"" + ReportUtils.escapeJson(file.getExtension()) + "\",\n");
-                writer.write("      \"icon\": \"" + FileIcon.getIcon(file.getExtension()) + "\"\n"); // Иконка как строка
+                writer.write("      \"icon\": \"" + fileIconService.getIcon(file.getExtension()) + "\"\n"); // ИСПРАВЛЕНО: используем fileIconService
                 writer.write("    }");
                 if (i < files.size() - 1) writer.write(",");
                 writer.write("\n");

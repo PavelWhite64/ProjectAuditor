@@ -1,5 +1,6 @@
 package com.example.auditor.reporting;
 
+import com.example.auditor.core.FileIconService;
 import com.example.auditor.core.ReportGenerator;
 import com.example.auditor.model.AnalysisConfig;
 import com.example.auditor.model.AnalysisResult;
@@ -12,14 +13,23 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Scanner;
 
 public class ReportGeneratorImpl implements ReportGenerator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ReportGeneratorImpl.class);
 
-    private final MarkdownReportGenerator markdownGenerator = new MarkdownReportGenerator();
-    private final HtmlReportGenerator htmlGenerator = new HtmlReportGenerator();
-    private final JsonMetadataGenerator jsonGenerator = new JsonMetadataGenerator();
+    private final MarkdownReportGenerator markdownGenerator;
+    private final HtmlReportGenerator htmlGenerator;
+    private final JsonMetadataGenerator jsonGenerator;
+    private final FileIconService fileIconService;
+
+    public ReportGeneratorImpl(FileIconService fileIconService) {
+        this.fileIconService = fileIconService;
+        this.markdownGenerator = new MarkdownReportGenerator(fileIconService);
+        this.htmlGenerator = new HtmlReportGenerator(fileIconService);
+        this.jsonGenerator = new JsonMetadataGenerator(fileIconService); // ИСПРАВЛЕНО: передаем fileIconService
+    }
 
     @Override
     public void generate(AnalysisResult result, AnalysisConfig config, Path outputDir) {
@@ -30,16 +40,14 @@ public class ReportGeneratorImpl implements ReportGenerator {
         boolean generateJson = config.shouldGenerateJsonMetadata();
         boolean openAfterwards = config.shouldOpenResultsAfterwards();
         String outputFileName = config.getOutputFileName();
-        // --- ПЕРЕДАЁМ projectPath ---
         Path projectPath = config.getProjectPath();
-        // --- /ПЕРЕДАЁМ projectPath ---
 
         // Создаем директорию вывода, если не существует
         try {
             Files.createDirectories(outputDir);
         } catch (IOException e) {
             LOGGER.error("Ошибка при создании директории вывода: {}", e.getMessage(), e);
-            return; // Прерываем генерацию
+            return;
         }
 
         // Генерация в зависимости от формата
@@ -51,19 +59,16 @@ public class ReportGeneratorImpl implements ReportGenerator {
 
         if (format == AnalysisConfig.OutputFormat.MARKDOWN || format == AnalysisConfig.OutputFormat.BOTH || format == AnalysisConfig.OutputFormat.STRUCTURE_ONLY) {
             markdownFile = outputDir.resolve(outputFileName + ".md").toString();
-            // Передаём projectPath в generate
             markdownGenerator.generate(files, projectName, projectType, lightMode, projectPath, markdownFile);
         }
 
         if (format == AnalysisConfig.OutputFormat.HTML || format == AnalysisConfig.OutputFormat.BOTH) {
             htmlFile = outputDir.resolve(outputFileName + ".html").toString();
-            // Передаём projectPath в generate
             htmlGenerator.generate(files, projectName, projectType, lightMode, projectPath, htmlFile);
         }
 
         if (generateJson) {
             jsonFile = outputDir.resolve(outputFileName + ".json").toString();
-            // JsonMetadataGenerator не читает содержимое файлов, передавать projectPath НЕ нужно
             jsonGenerator.generate(result, jsonFile);
         }
 
@@ -72,7 +77,7 @@ public class ReportGeneratorImpl implements ReportGenerator {
         System.out.println(" • HTML: " + (htmlFile != null ? htmlFile : "Не сгенерирован"));
         System.out.println(" • JSON: " + (jsonFile != null ? jsonFile : "Не сгенерирован"));
 
-        // Открытие результатов (остаётся в основном классе, так как это UI-логика)
+        // Открытие результатов
         if (openAfterwards) {
             System.out.println("  ");
             boolean openNow = readYesNo("Открыть результаты сейчас? ", true);
@@ -99,10 +104,10 @@ public class ReportGeneratorImpl implements ReportGenerator {
         }
     }
 
-    // Метод для получения ответа да/нет (упрощенная версия)
+    // Метод для получения ответа да/нет
     private boolean readYesNo(String prompt, boolean defaultYes) {
         System.out.print(prompt + (defaultYes ? " [Y/n]: " : " [y/N]: "));
-        String input = new java.util.Scanner(System.in).nextLine().trim().toLowerCase();
+        String input = new Scanner(System.in).nextLine().trim().toLowerCase();
         if (input.isEmpty()) {
             return defaultYes;
         }

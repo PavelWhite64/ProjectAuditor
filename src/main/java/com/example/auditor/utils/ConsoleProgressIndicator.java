@@ -1,27 +1,33 @@
 package com.example.auditor.utils;
 
-public class ProgressBar {
+import com.example.auditor.core.ProgressIndicator;
+
+/**
+ * Реализация ProgressIndicator для консольного вывода
+ */
+public class ConsoleProgressIndicator implements ProgressIndicator {
 
     private final String taskName;
-    private final int totalSteps;
+    private int totalSteps;
     private int currentStep = 0;
     private long startTime;
     private boolean finished = false;
 
-    public ProgressBar(String taskName, int totalSteps) {
+    public ConsoleProgressIndicator(String taskName, int totalSteps) {
         this.taskName = taskName;
         this.totalSteps = totalSteps;
         this.startTime = System.currentTimeMillis();
         update(0);
     }
 
+    @Override
     public synchronized void update(int currentStep) {
         this.currentStep = currentStep;
 
         if (finished) return;
 
         long elapsed = System.currentTimeMillis() - startTime;
-        double percent = (double) currentStep / totalSteps * 100;
+        double percent = totalSteps > 0 ? (double) currentStep / totalSteps * 100 : 0;
         String bar = getProgressBar(percent);
 
         // Очистка предыдущей строки
@@ -35,6 +41,7 @@ public class ProgressBar {
                 totalSteps);
     }
 
+    @Override
     public synchronized void finish() {
         if (finished) return;
 
@@ -45,6 +52,11 @@ public class ProgressBar {
         System.out.printf("\n%s завершен за %.2f сек\n",
                 taskName,
                 elapsed / 1000.0);
+    }
+
+    @Override
+    public void setTotalSteps(int totalSteps) {
+        this.totalSteps = totalSteps;
     }
 
     private String getProgressBar(double percent) {
