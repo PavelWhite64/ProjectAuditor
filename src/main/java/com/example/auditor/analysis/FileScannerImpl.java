@@ -3,7 +3,10 @@ package com.example.auditor.analysis;
 
 import com.example.auditor.core.ProjectScanner;
 import com.example.auditor.model.FileInfo;
-import com.example.auditor.utils.ProgressBar; // Убедитесь, что ProgressBar находится тут или импорт верен
+import com.example.auditor.utils.ProgressBar;
+import com.example.auditor.utils.FileTypeClassifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -12,66 +15,82 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Реализация ProjectScanner, использующая Files.walkFileTree для сканирования.
- */
 public class FileScannerImpl implements ProjectScanner {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileScannerImpl.class);
+
     @Override
-    public List<FileInfo> scan(Path projectPath) {
-        List<FileInfo> allFiles = new ArrayList<>();
-        // Предварительный проход для подсчета файлов для прогресс-бара
-        // Это может быть неточно, если файлы добавляются/удаляются во время сканирования,
-        // но даст приблизительный прогресс.
-        long totalEstimatedFiles = 0;
+    public List<FileInfo> scan(Path projectPath) throws IOException {
+        List<FileInfo> files = new ArrayList<>();
+
+        // Подсчитываем количество файлов для прогресс-бара
+        long totalFiles = 0;
         try {
-            totalEstimatedFiles = (int) Files.walk(projectPath)
+            totalFiles = Files.walk(projectPath)
                     .filter(Files::isRegularFile)
                     .count();
         } catch (IOException e) {
-            System.err.println("Ошибка при подсчете файлов для прогресс-бара: " + e.getMessage());
-            // Продолжаем со значением 1, чтобы прогресс-бар не сломался
-            totalEstimatedFiles = 1;
+            LOGGER.error("Ошибка при подсчете файлов: {}", e.getMessage(), e); // Логируем ошибку с трейсом
+            // В реальном коде логируйте правильно
+            return files; // Возвращаем пустой список или обрабатываем ошибку иначе
         }
 
-        ProgressBar progressBar = new ProgressBar("Сканирование файлов", (int) totalEstimatedFiles);
-        AtomicInteger processedCount = new AtomicInteger(0); // Используем AtomicInteger
+        ProgressBar progressBar = new ProgressBar("Сканирование файлов", (int) totalFiles);
+        AtomicInteger processed = new AtomicInteger(0); // Используем AtomicInteger
 
-        try {
-            Files.walkFileTree(projectPath, new SimpleFileVisitor<Path>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    if (Files.isRegularFile(file)) {
-                        String relativePath = projectPath.relativize(file).toString().replace('\\', '/');
-                        String name = file.getFileName().toString();
-                        long length = attrs.size();
-                        String extension = getExtension(name);
-                        // Тип файла пока устанавливаем как "FILE", логика определения типа (DATA, SCRIPT и т.д.)
-                        // может быть вынесена в отдельный компонент или добавлена позже в фильтре.
-                        String type = "FILE";
+        // Используем SimpleFileVisitor для обхода дерева файлов
+        Files.walkFileTree(projectPath, new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult visitFile(Path filePath, BasicFileAttributes attrs) throws IOException {
+                if (Files.isRegularFile(filePath)) { // Исправлено: filePath -> filePath
+                    try {
+                        // --- ОТЛАДКА ---
+                        String relativePath = projectPath.relativize(filePath).toString().replace('\\', '/');
+                        LOGGER.debug("Scanning file - Full: {}, Relative: {}", filePath, relativePath);
 
-                        allFiles.add(new FileInfo(file, name, relativePath, length, extension, type));
-                        progressBar.update(processedCount.incrementAndGet()); // Увеличиваем и обновляем прогресс
+                        FileInfo fileInfo = new FileInfo(
+                                filePath,
+                                filePath.getFileName().toString(),
+                                relativePath,
+                                attrs.size(),
+                                getFileExtension(filePath.getFileName().toString()),
+                                FileTypeClassifier.classify(filePath.getFileName().toString()) // Используем классификатор
+                        );
+                        files.add(fileInfo);
+                    } catch (Exception e) { // Ловим Exception, включая IOException от FileTypeClassifier
+                        LOGGER.error("Ошибка при обработке файла {}: {}", filePath, e.getMessage(), e); // Логируем ошибку с трейсом
+                        // Продолжаем сканирование остальных файлов
+                    } finally {
+                        // Обновляем прогресс-бар В ЛЮБОМ СЛУЧАЕ после попытки обработать файл
+                        progressBar.update(processed.incrementAndGet()); // Используем метод incrementAndGet()
                     }
-                    return FileVisitResult.CONTINUE;
+                } else {
+                    // Если файл не regular (например, символическая ссылка, FIFO и т.д.)
+                    // всё равно обновляем прогресс, так как он был учтён в Files.walk().count()
+                    progressBar.update(processed.incrementAndGet());
                 }
-            });
-            progressBar.finish();
-        } catch (IOException e) {
-            System.err.println("Ошибка при сканировании проекта: " + e.getMessage());
-            e.printStackTrace();
-            // В реальном приложении лучше выбросить исключение или вернуть пустой список с логом
-        }
+                return FileVisitResult.CONTINUE;
+            }
 
-        return allFiles;
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+                // Игнорируем ошибки доступа к отдельным файлам/каталогам
+                LOGGER.warn("Ошибка доступа к файлу/каталогу: {} ({})", file, exc.getMessage()); // Используем warn для предупреждений
+                // Обновляем прогресс, даже если доступ к файлу не удался
+                progressBar.update(processed.incrementAndGet());
+                return FileVisitResult.CONTINUE;
+            }
+        });
+
+        progressBar.finish();
+        return files;
     }
 
-    // Вспомогательный метод для получения расширения
-    private String getExtension(String fileName) {
+    private String getFileExtension(String fileName) {
         int lastDotIndex = fileName.lastIndexOf('.');
         if (lastDotIndex > 0 && lastDotIndex < fileName.length() - 1) {
-            return fileName.substring(lastDotIndex + 1).toLowerCase();
+            return fileName.substring(lastDotIndex + 1); // Без точки
         }
-        return null; // или возвращать пустую строку ""
+        return null; // или " "
     }
 }

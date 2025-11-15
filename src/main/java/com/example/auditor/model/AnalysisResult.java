@@ -22,9 +22,23 @@ public class AnalysisResult {
     }
 
     // Геттеры
-    public List<FileInfo> getFileInfoList() { return fileInfoList; } // Теперь возвращает List<FileInfo> из model
-    public String getProjectName() { return projectName; }
-    public String getProjectType() { return projectType; }
-    public long getTotalSizeKB() { return totalSizeKB; }
-    public int getTotalFiles() { return totalFiles; }
+    public List<FileInfo> getFileInfoList() {
+        return fileInfoList;
+    } // Теперь возвращает List<FileInfo> из model
+
+    public String getProjectName() {
+        return projectName;
+    }
+
+    public String getProjectType() {
+        return projectType;
+    }
+
+    public long getTotalSizeKB() {
+        return totalSizeKB;
+    }
+
+    public int getTotalFiles() {
+        return totalFiles;
+    }
 }

@@ -1,23 +1,15 @@
-// src/main/java/com/example/auditor/Main.java
 package com.example.auditor;
 
-import com.example.auditor.analysis.DefaultProjectAnalyzer;
-import com.example.auditor.analysis.FileFilterImpl;
-import com.example.auditor.analysis.FileScannerImpl;
+import com.example.auditor.config.ApplicationConfig;
 import com.example.auditor.core.ProjectAnalyzer;
-import com.example.auditor.core.ProjectScanner;
-import com.example.auditor.core.FileFilter;
-import com.example.auditor.core.UserInterface;
 import com.example.auditor.core.ReportGenerator;
 import com.example.auditor.model.AnalysisConfig;
 import com.example.auditor.model.AnalysisResult;
-import com.example.auditor.reporting.ReportGeneratorImpl;
-import com.example.auditor.ui.InteractivePrompter;
 import com.example.auditor.utils.ConsoleColors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 /**
  * Главный класс приложения ProjectAuditor.
@@ -25,35 +17,36 @@ import java.nio.file.Paths;
  */
 public class Main {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
+
     public static void main(String[] args) {
-        System.out.println(ConsoleColors.CYAN + "🚀 Запуск Project Auditor v1.0..." + ConsoleColors.RESET);
+        System.out.println(ConsoleColors.CYAN + "🚀 Запуск Project Auditor v1.0... " + ConsoleColors.RESET); // Это UI-вывод в консоль, можно оставить
 
         try {
-            // 1. Создаем зависимости (Dependency Injection "вручную")
-            UserInterface ui = new InteractivePrompter(); // Взаимодействие с пользователем
-            ProjectScanner scanner = new FileScannerImpl(); // Сканирование файлов
-            FileFilter fileFilter = new FileFilterImpl(); // Фильтрация файлов
-            ProjectAnalyzer analyzer = new DefaultProjectAnalyzer(scanner, fileFilter); // Анализ проекта
-            ReportGenerator generator = new ReportGeneratorImpl(); // Генерация отчетов
+            // 1. Создаем конфигурацию (Dependency Injection Container)
+            ApplicationConfig config = new ApplicationConfig();
 
-            // 2. Получаем конфигурацию от пользователя
-            System.out.println("Получение настроек анализа...");
-            AnalysisConfig config = ui.getUserConfig();
+            // 2. Получаем зависимости из конфигурации
+            ProjectAnalyzer analyzer = config.getProjectAnalyzer(); // Внедрение зависимости
+            ReportGenerator generator = config.getReportGenerator(); // Внедрение зависимости
 
-            // 3. Выполняем анализ
-            System.out.println("\nНачало анализа проекта...");
-            AnalysisResult result = analyzer.analyze(config);
+            // 3. Получаем конфигурацию от пользователя
+            System.out.println("Получение настроек анализа... ");
+            AnalysisConfig userConfig = config.getUserConfig(); // Внедрение зависимости UI и вызов метода
 
-            // 4. Генерируем отчеты
-            System.out.println("\nГенерация отчетов...");
-            Path outputDir = config.getProjectPath().getParent().resolve("auditor_output"); // Папка рядом с проектом
-            generator.generate(result, config, outputDir);
+            // 4. Выполняем анализ
+            System.out.println("\nНачало анализа проекта... ");
+            AnalysisResult result = analyzer.analyze(userConfig);
 
-            System.out.println(ConsoleColors.GREEN + "\n🎉 АНАЛИЗ ЗАВЕРШЕН УСПЕШНО!" + ConsoleColors.RESET);
+            // 5. Генерируем отчеты
+            System.out.println("\nГенерация отчетов... ");
+            Path outputDir = userConfig.getProjectPath().getParent().resolve("auditor_output"); // Папка рядом с проектом
+            generator.generate(result, userConfig, outputDir);
+
+            System.out.println(ConsoleColors.GREEN + "\n🎉 АНАЛИЗ ЗАВЕРШЕН УСПЕШНО! " + ConsoleColors.RESET); // UI-вывод
 
         } catch (Exception e) {
-            System.err.println(ConsoleColors.RED + "❌ Произошла ошибка: " + e.getMessage() + ConsoleColors.RESET);
-            e.printStackTrace();
+            LOGGER.error("Произошла ошибка: {}", e.getMessage(), e); // Логируем ошибку с трейсом
         }
     }
 }

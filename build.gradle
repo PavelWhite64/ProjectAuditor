@@ -24,6 +24,10 @@ dependencies {
     // testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
     // Для этого проекта зависимости, видимо, не требуются, так как он использует стандартные библиотеки Java
     // и встроенные утилиты. Оставляем пустым или комментируем пример.
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2' // Или последняя стабильная версия
+    implementation 'org.slf4j:slf4j-api:2.0.16' // Или последняя стабильная версия
+    implementation 'ch.qos.logback:logback-classic:1.5.12' // Или последняя стабильная версия
+
 }
 
 // Настройки тестирования (если есть тесты)

@@ -1,9 +1,6 @@
-// src/main/java/com/example/auditor/utils/FileIcon.java
-// Или src/main/java/com/example/auditor/FileIcon.java - на ваше усмотрение, но импорты в других файлах должны соответствовать
-package com.example.auditor.utils; // или com.example.auditor
+package com.example.auditor.utils;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -171,6 +168,7 @@ public class FileIcon {
 
     /**
      * Возвращает иконку для терминала на основе имени файла.
+     *
      * @param fileName Имя файла (например, "App.java", "Dockerfile").
      * @return Иконка в виде строки.
      */
@@ -188,6 +186,7 @@ public class FileIcon {
 
     /**
      * Возвращает иконку для HTML на основе имени файла.
+     *
      * @param fileName Имя файла.
      * @return Иконка в виде строки.
      */
@@ -203,6 +202,7 @@ public class FileIcon {
 
     /**
      * Возвращает язык программирования для подсветки синтаксиса на основе имени файла.
+     *
      * @param fileName Имя файла.
      * @return Язык в виде строки.
      */

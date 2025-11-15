@@ -1,4 +1,3 @@
-// src/main/java/com/example/auditor/core/FileFilter.java
 package com.example.auditor.core;
 
 import com.example.auditor.model.AnalysisConfig;
@@ -13,9 +12,10 @@ import java.util.List;
 public interface FileFilter {
     /**
      * Фильтрует список файлов на основе конфигурации.
-     * @param files Список файлов для фильтрации.
+     *
+     * @param files       Список файлов для фильтрации.
      * @param projectPath Путь к корню проекта (для .gitignore).
-     * @param config Конфигурация анализа, содержащая критерии фильтрации.
+     * @param config      Конфигурация анализа, содержащая критерии фильтрации.
      * @return Отфильтрованный список файлов.
      */
     List<FileInfo> filter(List<FileInfo> files, Path projectPath, AnalysisConfig config);

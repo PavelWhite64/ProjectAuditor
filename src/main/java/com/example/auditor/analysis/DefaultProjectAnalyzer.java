@@ -8,20 +8,26 @@ import com.example.auditor.model.AnalysisConfig;
 import com.example.auditor.model.AnalysisResult;
 import com.example.auditor.model.FileInfo;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Реализация ProjectAnalyzer, координирующая сканирование и фильтрацию.
  */
 public class DefaultProjectAnalyzer implements ProjectAnalyzer {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultProjectAnalyzer.class);
+
     private final ProjectScanner scanner;
     private final FileFilter fileFilter;
 
+    // Конструктор принимает зависимости
     public DefaultProjectAnalyzer(ProjectScanner scanner, FileFilter fileFilter) {
         this.scanner = scanner;
         this.fileFilter = fileFilter;
@@ -32,11 +38,17 @@ public class DefaultProjectAnalyzer implements ProjectAnalyzer {
         Path projectPath = config.getProjectPath();
 
         // 1. Сканируем проект
-        System.out.println("Сканирование проекта: " + projectPath);
-        List<FileInfo> allFiles = scanner.scan(projectPath);
+        LOGGER.info("Сканирование проекта: {}", projectPath);
+        List<FileInfo> allFiles = null;
+        try {
+            allFiles = scanner.scan(projectPath);
+        } catch (IOException e) {
+            LOGGER.error("Ошибка при сканировании проекта: {}", e.getMessage(), e); // Логируем ошибку
+            throw new RuntimeException(e);
+        }
 
         // 2. Фильтруем файлы
-        System.out.println("Фильтрация файлов...");
+        LOGGER.info("Фильтрация файлов...");
         List<FileInfo> filteredFiles = fileFilter.filter(allFiles, projectPath, config);
 
         // 3. Определяем тип проекта и собираем метаданные
@@ -45,7 +57,7 @@ public class DefaultProjectAnalyzer implements ProjectAnalyzer {
         long totalSizeKB = filteredFiles.stream().mapToLong(FileInfo::getLength).sum() / 1024;
         int totalFiles = filteredFiles.size();
 
-        System.out.println("Анализ завершен. Найдено " + totalFiles + " файлов.");
+        LOGGER.info("Анализ завершен. Найдено {} файлов.", totalFiles);
 
         // 4. Возвращаем результат
         return new AnalysisResult(filteredFiles, projectName, projectType, totalSizeKB, totalFiles);

@@ -1,4 +1,3 @@
-// src/main/java/com/example/auditor/model/AnalysisConfig.java
 package com.example.auditor.model;
 
 import java.nio.file.Path;
@@ -34,15 +33,41 @@ public class AnalysisConfig {
     }
 
     // Геттеры
-    public Path getProjectPath() { return projectPath; }
-    public OutputFormat getOutputFormat() { return outputFormat; }
-    public String getOutputFileName() { return outputFileName; }
-    public boolean shouldGenerateJsonMetadata() { return generateJsonMetadata; }
-    public boolean shouldOpenResultsAfterwards() { return openResultsAfterwards; }
-    public boolean shouldUseGitIgnore() { return useGitIgnore; }
-    public long getMaxFileSizeKB() { return maxFileSizeKB; }
-    public List<String> getExcludedPatterns() { return excludedPatterns; }
-    public boolean isLightMode() { return lightMode; }
+    public Path getProjectPath() {
+        return projectPath;
+    }
+
+    public OutputFormat getOutputFormat() {
+        return outputFormat;
+    }
+
+    public String getOutputFileName() {
+        return outputFileName;
+    }
+
+    public boolean shouldGenerateJsonMetadata() {
+        return generateJsonMetadata;
+    }
+
+    public boolean shouldOpenResultsAfterwards() {
+        return openResultsAfterwards;
+    }
+
+    public boolean shouldUseGitIgnore() {
+        return useGitIgnore;
+    }
+
+    public long getMaxFileSizeKB() {
+        return maxFileSizeKB;
+    }
+
+    public List<String> getExcludedPatterns() {
+        return excludedPatterns;
+    }
+
+    public boolean isLightMode() {
+        return lightMode;
+    }
 
     // Вспомогательный enum для формата вывода
     public enum OutputFormat {

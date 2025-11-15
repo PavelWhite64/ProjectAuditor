@@ -1,12 +1,15 @@
 // src/main/java/com/example/auditor/analysis/FileFilterImpl.java
 package com.example.auditor.analysis;
 
+import com.example.auditor.config.FilterConfiguration;
 import com.example.auditor.core.FileFilter;
 import com.example.auditor.model.AnalysisConfig;
 import com.example.auditor.model.FileInfo;
-import com.example.auditor.utils.GitIgnoreParser; // Убедитесь, что GitIgnoreParser находится тут или импорт верен
-import com.example.auditor.utils.PathMatcherUtil;
+import com.example.auditor.utils.GitIgnoreParser;
+import com.example.auditor.utils.PathMatcherUtil; // Предполагаем, что у вас есть этот утилитный класс
 import com.example.auditor.utils.ProgressBar;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -14,145 +17,105 @@ import java.util.List;
 
 /**
  * Реализация FileFilter, применяющая фильтры к списку файлов.
- * Теперь exclude и gitIgnore паттерны определяют жестко исключаемые файлы.
+ * Использует FilterConfiguration для получения списков паттернов и расширений.
+ * <p>
+ * Логика фильтрации (в порядке приоритета):
+ * 1. Файл исключается, если его размер превышает maxFileSizeKB (если maxFileSizeKB > 0).
+ * 2. Файл исключается, если его расширение находится в списке ненужных расширений (из FilterConfiguration).
+ * 3. Файл исключается, если он соответствует хотя бы одному паттерну из excludePatterns (из FilterConfiguration).
+ * 4. Файл исключается, если он соответствует хотя бы одному паттерну из .gitignore (если используется).
+ * 5. Все остальные файлы включаются. Файлы, соответствующие includePatterns (из FilterConfiguration), считаются приоритетными.
  */
 public class FileFilterImpl implements FileFilter {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileFilterImpl.class);
+
+    private final FilterConfiguration filterConfig;
+
+    public FileFilterImpl(FilterConfiguration filterConfig) {
+        this.filterConfig = filterConfig;
+    }
+
     @Override
     public List<FileInfo> filter(List<FileInfo> files, Path projectPath, AnalysisConfig config) {
-        List<String> includePatterns = getIncludePatterns(); // Список приоритетных паттернов
-        List<String> excludePatterns = getExcludePatterns(); // Список жестко исключаемых паттернов
-        List<String> gitIgnorePatterns = new ArrayList<>();
+        List<String> includePatterns = filterConfig.getIncludePatterns(); // Получаем из конфигурации
+        List<String> excludePatterns = filterConfig.getExcludePatterns(); // Получаем из конфигурации
 
+        List<String> gitIgnorePatterns = new ArrayList<>();
         if (config.shouldUseGitIgnore()) {
-            // Исправление: передаем projectPath.toString()
             gitIgnorePatterns = new GitIgnoreParser().parseGitIgnore(projectPath.toString());
         }
 
-        long maxFileSizeKB = config.getMaxFileSizeKB(); // Теперь это 0, если ограничений нет
+        long maxFileSizeBytes = config.getMaxFileSizeKB() > 0 ? config.getMaxFileSizeKB() * 1024L : -1; // -1 означает нет лимита
+
         List<FileInfo> filteredFiles = new ArrayList<>();
         ProgressBar progressBar = new ProgressBar("Фильтрация файлов", files.size());
         int processed = 0;
 
-        // --- ОТЛАДКА: Выведем несколько файлов и результаты матчинга ---
-        int debugPrinted = 0; // Счетчик для первых N файлов
-        final int debugCount = 5; // Сколько файлов отладить
-        // --- /ОТЛАДКА ---
-
         for (FileInfo file : files) {
             progressBar.update(processed++);
 
-            // Проверка размера файла: если maxFileSizeKB == 0, ограничений нет
-            // Теперь логика безопасна от переполнения
-            if (maxFileSizeKB > 0) {
-                long maxSizeBytes = maxFileSizeKB * 1024L; // Умножаем ТОЛЬКО если > 0
-                if (file.getLength() > maxSizeBytes) {
-                    // Если файл больше лимита и лимит > 0, пропускаем
-                    continue;
-                }
+            // --- ОТЛАДКА ---
+            LOGGER.debug("Processing file: {} (Extension: {}, Size: {} bytes, Type: {})", file.getRelativePath(), file.getExtension(), file.getLength(), file.getType());
+
+            // 1. Проверка размера файла (если установлен лимит)
+            if (maxFileSizeBytes > 0 && file.getLength() > maxFileSizeBytes) {
+                LOGGER.debug("Excluded by size: {}", file.getRelativePath());
+                continue; // Файл слишком большой, исключаем
             }
-            // Если maxFileSizeKB == 0, проверка не выполняется, файл проходит дальше
 
-            // --- ОТЛАДКА: Проверим первые N файлов ---
-            if (debugPrinted < debugCount) { // Проверим первые N файлов
-                System.out.println("DEBUG: Проверка файла: " + file.getRelativePath());
-                System.out.println("DEBUG: Длина файла: " + file.getLength());
-                System.out.println("DEBUG: Расширение файла: " + file.getExtension());
-
-                // Проверка exclude паттернов (жёсткое исключение)
-                boolean excludeMatch = PathMatcherUtil.matchFile(file.getRelativePath(), excludePatterns);
-                System.out.println("DEBUG: Exclude match: " + excludeMatch + " для паттернов: " + excludePatterns);
-
-                if (excludeMatch) {
-                    System.out.println("DEBUG: Файл " + file.getRelativePath() + " исключён по exclude паттерну.");
-                    debugPrinted++; // Увеличиваем только если файл исключён
-                    continue; // Переходим к следующему файлу, не проверяя gitignore
-                }
-
-                // Проверка .gitignore (жёсткое исключение)
-                boolean gitIgnoreMatch = PathMatcherUtil.matchFile(file.getRelativePath(), gitIgnorePatterns);
-                System.out.println("DEBUG: GitIgnore match: " + gitIgnoreMatch + " для паттернов: " + gitIgnorePatterns);
-
-                if (gitIgnoreMatch) {
-                    System.out.println("DEBUG: Файл " + file.getRelativePath() + " исключён по .gitignore.");
-                    debugPrinted++; // Увеличиваем только если файл исключён
-                    continue; // Переходим к следующему файлу
-                }
-                debugPrinted++; // Увеличиваем, если файл не исключён
-                System.out.println("---");
+            // 2. Быстрая проверка расширения файла (до сложных паттернов)
+            String extension = getExtension(file.getName()).toLowerCase(); // Приводим к нижнему регистру для сравнения
+            LOGGER.debug("Checking extension '{}' for file '{}'", extension, file.getRelativePath());
+            LOGGER.debug("Blacklisted extensions: {}", filterConfig.getBlacklistedExtensions());
+            if (filterConfig.getBlacklistedExtensions().contains(extension)) {
+                LOGGER.debug("Excluded by blacklisted extension: {} (Extension: {})", file.getRelativePath(), extension);
+                continue; // Расширение в чёрном списке, исключаем
             }
-            // --- /ОТЛАДКА ---
 
-
-            // Проверка exclude паттернов (жёсткое исключение)
+            // 3. Проверка exclude паттернов (жёсткое исключение, теперь после проверки расширения)
+            LOGGER.debug("Checking exclude patterns for file '{}'", file.getRelativePath());
+            LOGGER.debug("Exclude patterns: {}", excludePatterns);
             boolean excludeMatch = PathMatcherUtil.matchFile(file.getRelativePath(), excludePatterns);
             if (excludeMatch) {
-                //System.out.println("DEBUG: Файл " + file.getRelativePath() + " прошёл Exclude проверку.");
+                LOGGER.debug("Excluded by exclude pattern: {}", file.getRelativePath());
                 continue; // Соответствует exclude паттерну - исключаем
             }
+            // Блок 'else' с проверкой .git удален.
 
-            // Проверка .gitignore (жёсткое исключение)
-            boolean gitIgnoreMatch = PathMatcherUtil.matchFile(file.getRelativePath(), gitIgnorePatterns);
-            if (gitIgnoreMatch) {
-                //System.out.println("DEBUG: Файл " + file.getRelativePath() + " прошёл GitIgnore проверку.");
+            // 4. Проверка .gitignore (жёсткое исключение)
+            if (PathMatcherUtil.matchFile(file.getRelativePath(), gitIgnorePatterns)) {
+                LOGGER.debug("Excluded by .gitignore pattern: {}", file.getRelativePath());
                 continue; // Соответствует .gitignore паттерну - исключаем
             }
 
-            // Если файл не исключён, он проходит фильтрацию
-            // (Файлы, соответствующие include, также проходят, так как не исключены)
+            // 5. Если файл прошёл все проверки на исключение, добавляем его
+            //    и отмечаем как приоритетный, если он соответствует include паттернам.
+            boolean isPriority = PathMatcherUtil.matchFile(file.getRelativePath(), includePatterns);
+            file.setPriority(isPriority); // Используем сеттер для установки приоритета
+            LOGGER.debug("INCLUDED: {} (Priority: {})", file.getRelativePath(), isPriority);
             filteredFiles.add(file);
         }
+
         progressBar.finish();
-        System.out.println("DEBUG: Всего файлов до фильтрации: " + files.size());
-        System.out.println("DEBUG: Всего файлов после фильтрации: " + filteredFiles.size());
+        LOGGER.debug("Filtered {} files out of {} total.", filteredFiles.size(), files.size());
         return filteredFiles;
     }
 
-    // --- Вспомогательные методы для получения паттернов ---
-    // Эти списки можно хранить в отдельном конфигурационном файле
-    private List<String> getIncludePatterns() {
-        // Эти паттерны определяют ПРИОРИТЕТНЫЕ файлы, которые включаются, если не исключены
-        return List.of(
-                "**/*.java", "**/*.kt", "**/*.scala", "**/*.groovy", "**/*.py", "**/*.js", "**/*.ts",
-                "**/*.go", "**/*.rs", "**/*.cpp", "**/*.c", "**/*.h", "**/*.hpp", "**/*.cs",
-                "**/*.php", "**/*.rb", "**/*.pl", "**/*.pm", "**/*.sql", "**/*.xml", "**/*.json",
-                "**/*.yaml", "**/*.yml", "**/*.properties", "**/*.cfg", "**/*.conf", "**/*.ini",
-                "**/*.sh", "**/*.bat", "**/*.cmd", "**/*.ps1", "**/*.sql", "**/*.txt", "**/*.md",
-                "**/*.html", "**/*.htm", "**/*.css", "**/*.scss", "**/*.less", "**/*.vue", "**/*.svelte",
-                "**/Dockerfile", "**/docker-compose.yml", "**/Makefile", "**/CMakeLists.txt", "**/build.gradle",
-                "**/pom.xml", "**/package.json", "**/requirements.txt", "**/setup.py", "**/go.mod",
-                "**/*.feature", "**/*.robot", "**/*.test", "**/*test*", "**/*spec*"
-        );
-    }
+    // --- Вспомогательные методы для получения паттернов и расширения ---
 
-    private List<String> getExcludePatterns() {
-        return List.of(
-                // Системные и служебные
-                ".git/**", ".svn/**", ".hg/**", "CVS/**", // Исправлено: .git/** вместо **/.git/**
-                // IDE
-                ".idea/**", "*.iml", "*.ipr", "*.iws", "nbproject/**", "nbactions.xml",
-                ".vs/**", ".vscode/**", "*.swp", "*.swo", "._*", // Добавлен **/._* для Mac
-                // Бинарные и артефакты
-                "target/**", "build/**", "dist/**", "out/**", "bin/**", "obj/**", // Исправлено
-                "*.jar", "*.war", "*.ear", "*.zip", "*.rar", "*.tar.gz", "*.so",
-                "*.dll", "*.exe", "*.class", "*.o", "*.a", "*.lib", "*.dylib",
-                "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.ico", "*.svg",
-                "*.pdf", "*.doc", "*.docx", "*.xls", "*.xlsx", "*.ppt", "*.pptx",
-                // Логи и временные файлы
-                "logs/**", "*.log", "tmp/**", "temp/**", "*.tmp", "*.temp",
-                // Node.js
-                "node_modules/**", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*",
-                // Python
-                "__pycache__/**", "*.pyc", "*.pyo", "*.pyd", ".pytest_cache/**", ".coverage",
-                // Go
-                "vendor/**", // Хотя vendor может быть интересен, часто исключается
-                // .NET
-                "packages/**", "TestResults/**", "*.nupkg", "*.snupkg",
-                // Другие
-                "*secret*", "*password*", "*credential*", "*.key", "*.pem", "*.crt",
-                "*.cert", "*.pfx", "*.property", // config.property исключается через паттерн
-                "application-*.yml", "application-*.yaml", "application-*.properties",
-                "local.*", "dev.*", "prod.*", "test.*", ".env*"
-        );
+    /**
+     * Возвращает расширение файла, включая точку (например, ".java").
+     * Если файл не имеет расширения, возвращает пустую строку.
+     *
+     * @param fileName Имя файла.
+     * @return Расширение файла или пустая строка.
+     */
+    private String getExtension(String fileName) {
+        int lastDotIndex = fileName.lastIndexOf('.');
+        if (lastDotIndex > 0 && lastDotIndex < fileName.length() - 1) {
+            return fileName.substring(lastDotIndex); // Включает точку
+        }
+        return "";
     }
 }
