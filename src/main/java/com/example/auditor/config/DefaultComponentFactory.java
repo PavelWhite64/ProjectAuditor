@@ -4,7 +4,7 @@ import com.example.auditor.analysis.DefaultProjectAnalyzer;
 import com.example.auditor.analysis.FileFilterImpl;
 import com.example.auditor.analysis.FileScannerImpl;
 import com.example.auditor.core.*;
-import com.example.auditor.reporting.ReportGeneratorImpl;
+import com.example.auditor.reporting.*;
 import com.example.auditor.ui.InteractivePrompter;
 import com.example.auditor.utils.ConsoleProgressIndicator;
 import com.example.auditor.utils.DefaultFileIconService;
@@ -12,6 +12,8 @@ import com.example.auditor.utils.DefaultFileTypeClassifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
 /**
@@ -51,9 +53,15 @@ public class DefaultComponentFactory implements ComponentFactory {
 
     @Override
     public ReportGenerator createReportGenerator() {
-        LOGGER.debug("Creating ReportGenerator (ReportGeneratorImpl)");
+        LOGGER.debug("Creating CompositeReportGenerator with strategies");
         FileIconService fileIconService = createFileIconService();
-        return new ReportGeneratorImpl(fileIconService);
+
+        List<ReportStrategy> strategies = new ArrayList<>();
+        strategies.add(new MarkdownReportStrategy(fileIconService));
+        strategies.add(new HtmlReportStrategy(fileIconService));
+        strategies.add(new JsonReportStrategy(fileIconService));
+
+        return new CompositeReportGenerator(strategies);
     }
 
     @Override
