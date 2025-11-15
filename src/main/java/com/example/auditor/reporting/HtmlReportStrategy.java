@@ -1,6 +1,7 @@
 package com.example.auditor.reporting;
 
 import com.example.auditor.core.FileIconService;
+import com.example.auditor.core.FileSystem;
 import com.example.auditor.core.ReportStrategy;
 import com.example.auditor.model.AnalysisConfig;
 import com.example.auditor.model.AnalysisResult;
@@ -19,11 +20,19 @@ public class HtmlReportStrategy implements ReportStrategy {
     private static final Logger LOGGER = LoggerFactory.getLogger(HtmlReportStrategy.class);
 
     private final FileIconService fileIconService;
+    private final FileSystem fileSystem;
     private final HtmlReportGenerator htmlGenerator;
 
-    public HtmlReportStrategy(FileIconService fileIconService) {
+    // Новый конструктор с FileSystem
+    public HtmlReportStrategy(FileIconService fileIconService, FileSystem fileSystem) {
         this.fileIconService = fileIconService;
-        this.htmlGenerator = new HtmlReportGenerator(fileIconService);
+        this.fileSystem = fileSystem;
+        this.htmlGenerator = new HtmlReportGenerator(fileIconService, fileSystem);
+    }
+
+    // Старый конструктор для обратной совместимости
+    public HtmlReportStrategy(FileIconService fileIconService) {
+        this(fileIconService, new com.example.auditor.core.DefaultFileSystem());
     }
 
     @Override
@@ -41,7 +50,6 @@ public class HtmlReportStrategy implements ReportStrategy {
         boolean lightMode = config.isLightMode();
         Path projectPath = config.getProjectPath();
 
-        // Получаем ограничения из конфигурации
         long maxContentSizeBytes = config.getMaxContentSizeBytes();
         int maxLinesPerFile = config.getMaxLinesPerFile();
 

@@ -1,6 +1,7 @@
 package com.example.auditor.reporting;
 
 import com.example.auditor.core.FileIconService;
+import com.example.auditor.core.FileSystem;
 import com.example.auditor.model.FileInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,12 +22,13 @@ public class HtmlReportGenerator {
     private static final Logger LOGGER = LoggerFactory.getLogger(HtmlReportGenerator.class);
 
     private final FileIconService fileIconService;
+    private final FileSystem fileSystem;
 
-    public HtmlReportGenerator(FileIconService fileIconService) {
+    public HtmlReportGenerator(FileIconService fileIconService, FileSystem fileSystem) {
         this.fileIconService = fileIconService;
+        this.fileSystem = fileSystem;
     }
 
-    // Метод generate теперь принимает ограничения для чтения файлов
     public void generate(List<FileInfo> files, String projectName, String projectType, boolean lightMode,
                          Path projectPath, String outputFile, long maxContentSizeBytes, int maxLinesPerFile) {
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), StandardCharsets.UTF_8))) {
@@ -76,7 +78,6 @@ public class HtmlReportGenerator {
                     String language = fileIconService.getLanguage(file.getExtension());
                     double kb = file.getLength() / 1024.0;
 
-                    // Добавляем предупреждение для больших файлов
                     if (file.getLength() > maxContentSizeBytes) {
                         writer.write("<div class=\"warning\">\n");
                         writer.write("<strong>Примечание:</strong> Файл слишком большой (" + String.format(Locale.US, "%.1f", kb) + " KB). Содержимое не будет прочитано полностью.\n");
@@ -90,8 +91,8 @@ public class HtmlReportGenerator {
                     writer.write("<h3>" + icon + " " + ReportUtils.escapeHtml(file.getRelativePath()) + " (" + String.format(Locale.US, "%.1f", kb) + " KB)</h3>\n");
                     writer.write("<pre><code class=\"" + ReportUtils.escapeHtml(language) + "\">\n");
                     try {
-                        // Используем ограничения при чтении содержимого файла
-                        String content = ReportUtils.readFileContent(file.getFullName(), projectPath, maxContentSizeBytes, maxLinesPerFile);
+                        // Используем FileSystem для чтения содержимого
+                        String content = ReportUtils.readFileContent(file.getFullName(), projectPath, maxContentSizeBytes, maxLinesPerFile, fileSystem);
                         writer.write(ReportUtils.escapeHtml(content));
                     } catch (IOException e) {
                         writer.write("<!-- Ошибка чтения файла: " + ReportUtils.escapeHtml(e.getMessage()) + " -->");

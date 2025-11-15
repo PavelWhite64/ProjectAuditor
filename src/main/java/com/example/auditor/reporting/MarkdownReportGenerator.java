@@ -1,6 +1,7 @@
 package com.example.auditor.reporting;
 
 import com.example.auditor.core.FileIconService;
+import com.example.auditor.core.FileSystem;
 import com.example.auditor.model.FileInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,9 +22,11 @@ public class MarkdownReportGenerator {
     private static final Logger LOGGER = LoggerFactory.getLogger(MarkdownReportGenerator.class);
 
     private final FileIconService fileIconService;
+    private final FileSystem fileSystem;
 
-    public MarkdownReportGenerator(FileIconService fileIconService) {
+    public MarkdownReportGenerator(FileIconService fileIconService, FileSystem fileSystem) {
         this.fileIconService = fileIconService;
+        this.fileSystem = fileSystem;
     }
 
     // Метод generate теперь принимает ограничения для чтения файлов
@@ -77,8 +80,8 @@ public class MarkdownReportGenerator {
                     writer.write("\n" + warning + "### " + icon + " " + escapeMarkdown(file.getRelativePath()) + " (`" + String.format(Locale.US, "%.1f", kb) + " KB`)\n");
                     writer.write("```" + language + "\n");
                     try {
-                        // Используем ограничения при чтении содержимого файла
-                        String content = ReportUtils.readFileContent(file.getFullName(), projectPath, maxContentSizeBytes, maxLinesPerFile);
+                        // Используем ограничения при чтении содержимого файла с FileSystem
+                        String content = ReportUtils.readFileContent(file.getFullName(), projectPath, maxContentSizeBytes, maxLinesPerFile, fileSystem);
                         writer.write(content.trim() + "\n");
                     } catch (IOException e) {
                         writer.write("<!-- Ошибка чтения файла: " + e.getMessage() + " -->\n");

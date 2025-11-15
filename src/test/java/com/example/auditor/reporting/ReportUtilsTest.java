@@ -2,6 +2,8 @@ package com.example.auditor.reporting;
 
 import com.example.auditor.ProjectAuditorTest;
 import com.example.auditor.core.FileIconService;
+import com.example.auditor.core.FileSystem;
+import com.example.auditor.core.DefaultFileSystem;
 import com.example.auditor.model.FileInfo;
 import com.example.auditor.utils.DefaultFileIconService;
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReportUtilsTest extends ProjectAuditorTest {
 
     private final FileIconService fileIconService = new DefaultFileIconService();
+    private final FileSystem fileSystem = new DefaultFileSystem();
 
     @Test
     void shouldEscapeMarkdownCorrectly() {
@@ -61,7 +64,7 @@ class ReportUtilsTest extends ProjectAuditorTest {
         Files.writeString(testFile, content);
 
         // When
-        String result = ReportUtils.readFileContent(testFile, tempDir, 1000, 3);
+        String result = ReportUtils.readFileContent(testFile, tempDir, 1000, 3, fileSystem);
 
         // Then
         assertThat(result).contains("Line 1", "Line 2", "Line 3");
@@ -76,7 +79,7 @@ class ReportUtilsTest extends ProjectAuditorTest {
         Files.createFile(emptyFile);
 
         // When
-        String result = ReportUtils.readFileContent(emptyFile, tempDir, 1000, 10);
+        String result = ReportUtils.readFileContent(emptyFile, tempDir, 1000, 10, fileSystem);
 
         // Then
         assertThat(result).isEqualTo("<!-- EMPTY FILE -->");
@@ -92,7 +95,7 @@ class ReportUtilsTest extends ProjectAuditorTest {
         Files.createDirectories(differentBase);
 
         // When
-        String result = ReportUtils.readFileContent(outsideFile, differentBase, 1000, 10);
+        String result = ReportUtils.readFileContent(outsideFile, differentBase, 1000, 10, fileSystem);
 
         // Then
         assertThat(result).isEqualTo("<!-- SECURITY: File outside base directory -->");
@@ -128,7 +131,7 @@ class ReportUtilsTest extends ProjectAuditorTest {
 
         // Убедимся, что файл меньше лимита размера (увеличим лимит до 2000 байт)
         // When - устанавливаем лимит строк 20 (меньше чем 30 строк в файле)
-        String result = ReportUtils.readFileContent(largeFile, tempDir, 2000, 20);
+        String result = ReportUtils.readFileContent(largeFile, tempDir, 2000, 20, fileSystem);
 
         // Then - должен быть сообщение о truncation
         assertThat(result).contains("CONTENT TRUNCATED");
@@ -143,7 +146,7 @@ class ReportUtilsTest extends ProjectAuditorTest {
         long fileSize = Files.size(veryLargeFile);
 
         // When - устанавливаем очень маленький лимит размера
-        String result = ReportUtils.readFileContent(veryLargeFile, tempDir, 100, 100);
+        String result = ReportUtils.readFileContent(veryLargeFile, tempDir, 100, 100, fileSystem);
 
         // Then - должен быть сообщение о том, что файл слишком большой
         assertThat(result).contains("FILE TOO LARGE");
@@ -157,7 +160,7 @@ class ReportUtilsTest extends ProjectAuditorTest {
         long fileSize = Files.size(exactSizeFile);
 
         // When - устанавливаем лимит размера равным размеру файла
-        String result = ReportUtils.readFileContent(exactSizeFile, tempDir, fileSize, 100);
+        String result = ReportUtils.readFileContent(exactSizeFile, tempDir, fileSize, 100, fileSystem);
 
         // Then - файл должен быть прочитан полностью без сообщения о превышении размера
         assertThat(result).doesNotContain("FILE TOO LARGE");

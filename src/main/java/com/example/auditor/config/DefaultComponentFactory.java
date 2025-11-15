@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * Реализация фабрики компонентов с явным созданием зависимостей.
- * Теперь создает InteractivePrompter с правильной кодировкой.
+ * Теперь создает InteractivePrompter с правильной кодировкой и FileSystem.
  */
 public class DefaultComponentFactory implements ComponentFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultComponentFactory.class);
@@ -32,7 +32,8 @@ public class DefaultComponentFactory implements ComponentFactory {
     public ProjectScanner createProjectScanner() {
         LOGGER.debug("Creating ProjectScanner (FileScannerImpl)");
         FileTypeClassifier fileTypeClassifier = createFileTypeClassifier();
-        return new FileScannerImpl(fileTypeClassifier);
+        FileSystem fileSystem = createFileSystem();
+        return new FileScannerImpl(fileTypeClassifier, fileSystem);
     }
 
     @Override
@@ -53,10 +54,11 @@ public class DefaultComponentFactory implements ComponentFactory {
     public ReportGenerator createReportGenerator() {
         LOGGER.debug("Creating CompositeReportGenerator with strategies");
         FileIconService fileIconService = createFileIconService();
+        FileSystem fileSystem = createFileSystem();
 
         List<ReportStrategy> strategies = new ArrayList<>();
-        strategies.add(new MarkdownReportStrategy(fileIconService));
-        strategies.add(new HtmlReportStrategy(fileIconService));
+        strategies.add(new MarkdownReportStrategy(fileIconService, fileSystem));
+        strategies.add(new HtmlReportStrategy(fileIconService, fileSystem));
         strategies.add(new JsonReportStrategy(fileIconService));
 
         return new CompositeReportGenerator(strategies);
@@ -91,6 +93,14 @@ public class DefaultComponentFactory implements ComponentFactory {
     public FileIconService createFileIconService() {
         LOGGER.debug("Creating FileIconService");
         return new DefaultFileIconService();
+    }
+
+    /**
+     * Создает файловую систему
+     */
+    public FileSystem createFileSystem() {
+        LOGGER.debug("Creating FileSystem (DefaultFileSystem)");
+        return new DefaultFileSystem();
     }
 
     private FilterConfiguration loadFilterConfiguration() {

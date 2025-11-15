@@ -1,6 +1,7 @@
 package com.example.auditor.reporting;
 
 import com.example.auditor.core.FileIconService;
+import com.example.auditor.core.FileSystem;
 import com.example.auditor.core.ReportStrategy;
 import com.example.auditor.model.AnalysisConfig;
 import com.example.auditor.model.AnalysisResult;
@@ -17,17 +18,24 @@ public class JsonReportStrategy implements ReportStrategy {
     private static final Logger LOGGER = LoggerFactory.getLogger(JsonReportStrategy.class);
 
     private final FileIconService fileIconService;
+    private final FileSystem fileSystem;
     private final JsonMetadataGenerator jsonGenerator;
 
-    public JsonReportStrategy(FileIconService fileIconService) {
+    // Новый конструктор с FileSystem
+    public JsonReportStrategy(FileIconService fileIconService, FileSystem fileSystem) {
         this.fileIconService = fileIconService;
+        this.fileSystem = fileSystem;
         this.jsonGenerator = new JsonMetadataGenerator(fileIconService);
+    }
+
+    // Старый конструктор для обратной совместимости
+    public JsonReportStrategy(FileIconService fileIconService) {
+        this(fileIconService, new com.example.auditor.core.DefaultFileSystem());
     }
 
     @Override
     public boolean supports(AnalysisConfig.OutputFormat format) {
-        // JSON генерируется отдельно от основных форматов, всегда доступен если включена опция
-        return true; // Всегда доступен, если пользователь выбрал генерацию JSON
+        return true;
     }
 
     @Override

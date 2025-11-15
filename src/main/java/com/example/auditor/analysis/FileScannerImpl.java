@@ -1,5 +1,6 @@
 package com.example.auditor.analysis;
 
+import com.example.auditor.core.FileSystem;
 import com.example.auditor.core.FileTypeClassifier;
 import com.example.auditor.core.ProjectScanner;
 import com.example.auditor.model.FileInfo;
@@ -13,8 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -27,54 +27,55 @@ public class FileScannerImpl implements ProjectScanner {
 
     // Статическое поле для хранения игнорируемых директорий
     private static volatile Set<String> ignoredDirectories = null;
-    private static final Object lock = new Object(); // Объект для синхронизации
+    private static final Object lock = new Object();
 
     private final FileTypeClassifier fileTypeClassifier;
+    private final FileSystem fileSystem;
 
-    public FileScannerImpl(FileTypeClassifier fileTypeClassifier) {
+    // Обновленный конструктор с FileSystem
+    public FileScannerImpl(FileTypeClassifier fileTypeClassifier, FileSystem fileSystem) {
         this.fileTypeClassifier = fileTypeClassifier;
+        this.fileSystem = fileSystem;
+    }
+
+    // Старый конструктор для обратной совместимости
+    public FileScannerImpl(FileTypeClassifier fileTypeClassifier) {
+        this(fileTypeClassifier, new com.example.auditor.core.DefaultFileSystem());
     }
 
     @Override
     public List<FileInfo> scan(Path projectPath) throws IOException {
         List<FileInfo> files = new ArrayList<>();
-
-        // Прогресс-бар инициализируется, но обновляется только при фактическом добавлении файлов
         ConsoleProgressIndicator progressBar = new ConsoleProgressIndicator("Сканирование файлов", 100);
         AtomicInteger processed = new AtomicInteger(0);
 
-        // Используем SimpleFileVisitor для обхода дерева файлов
-        Files.walkFileTree(projectPath, new SimpleFileVisitor<Path>() {
+        // Используем FileSystem для обхода файлов
+        fileSystem.walkFileTree(projectPath, new FileSystem.FileVisitor() {
             @Override
-            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                // Проверяем безопасность директории
+            public FileSystem.FileVisitResult preVisitDirectory(Path dir) throws IOException {
                 if (!SecurityUtils.isSafeDirectory(dir, projectPath)) {
                     LOGGER.warn("Пропуск небезопасной директории: {}", dir);
-                    return FileVisitResult.SKIP_SUBTREE;
+                    return FileSystem.FileVisitResult.SKIP_SUBTREE;
                 }
 
-                // Получаем имя директории
                 String dirName = dir.getFileName().toString();
-
-                // Проверяем, нужно ли игнорировать эту директорию
                 Set<String> ignoredDirs = getIgnoredDirectories();
                 if (ignoredDirs.contains(dirName)) {
                     LOGGER.debug("Пропуск игнорируемого каталога: {}", dir);
-                    return FileVisitResult.SKIP_SUBTREE;
+                    return FileSystem.FileVisitResult.SKIP_SUBTREE;
                 }
 
-                return FileVisitResult.CONTINUE;
+                return FileSystem.FileVisitResult.CONTINUE;
             }
 
             @Override
-            public FileVisitResult visitFile(Path filePath, BasicFileAttributes attrs) throws IOException {
-                // Проверяем безопасность файла
+            public FileSystem.FileVisitResult visitFile(Path filePath) throws IOException {
                 if (!SecurityUtils.isSafePath(filePath, projectPath)) {
                     LOGGER.warn("Пропуск небезопасного файла: {}", filePath);
-                    return FileVisitResult.CONTINUE;
+                    return FileSystem.FileVisitResult.CONTINUE;
                 }
 
-                if (Files.isRegularFile(filePath)) {
+                if (fileSystem.isRegularFile(filePath)) {
                     try {
                         String relativePath = projectPath.relativize(filePath).toString().replace('\\', '/');
                         LOGGER.debug("Scanning file - Full: {}, Relative: {}", filePath, relativePath);
@@ -83,10 +84,10 @@ public class FileScannerImpl implements ProjectScanner {
                                 filePath,
                                 filePath.getFileName().toString(),
                                 relativePath,
-                                attrs.size(),
+                                fileSystem.getFileSize(filePath),
                                 FileExtensionUtils.getExtension(filePath.getFileName().toString(),
                                         FileExtensionUtils.ExtensionFormat.WITHOUT_DOT),
-                                fileTypeClassifier.classify(filePath.getFileName().toString()) // Используем инжектированный классификатор
+                                fileTypeClassifier.classify(filePath.getFileName().toString())
                         );
                         files.add(fileInfo);
                     } catch (Exception e) {
@@ -95,13 +96,18 @@ public class FileScannerImpl implements ProjectScanner {
                         progressBar.update(processed.incrementAndGet());
                     }
                 }
-                return FileVisitResult.CONTINUE;
+                return FileSystem.FileVisitResult.CONTINUE;
             }
 
             @Override
-            public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+            public FileSystem.FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
                 LOGGER.warn("Ошибка доступа к файлу/каталогу: {} ({})", file, exc.getMessage());
-                return FileVisitResult.CONTINUE;
+                return FileSystem.FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileSystem.FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                return FileSystem.FileVisitResult.CONTINUE;
             }
         });
 
@@ -110,7 +116,6 @@ public class FileScannerImpl implements ProjectScanner {
         return files;
     }
 
-    // Приватный метод для получения инициализированного списка (с одиночной загрузкой)
     private static Set<String> getIgnoredDirectories() {
         if (ignoredDirectories == null) {
             synchronized (lock) {
@@ -122,7 +127,6 @@ public class FileScannerImpl implements ProjectScanner {
         return ignoredDirectories;
     }
 
-    // Приватный метод для загрузки списка из JSON-ресурса
     private static Set<String> loadIgnoredDirectoriesFromResource(String resourcePath) {
         ObjectMapper mapper = new ObjectMapper();
         try (InputStream resourceStream = FileScannerImpl.class.getResourceAsStream(resourcePath)) {

@@ -1,6 +1,7 @@
 package com.example.auditor.reporting;
 
 import com.example.auditor.core.FileIconService;
+import com.example.auditor.core.FileSystem;
 import com.example.auditor.core.ReportStrategy;
 import com.example.auditor.model.AnalysisConfig;
 import com.example.auditor.model.AnalysisResult;
@@ -19,11 +20,13 @@ public class MarkdownReportStrategy implements ReportStrategy {
     private static final Logger LOGGER = LoggerFactory.getLogger(MarkdownReportStrategy.class);
 
     private final FileIconService fileIconService;
+    private final FileSystem fileSystem;
     private final MarkdownReportGenerator markdownGenerator;
 
-    public MarkdownReportStrategy(FileIconService fileIconService) {
+    public MarkdownReportStrategy(FileIconService fileIconService, FileSystem fileSystem) {
         this.fileIconService = fileIconService;
-        this.markdownGenerator = new MarkdownReportGenerator(fileIconService);
+        this.fileSystem = fileSystem;
+        this.markdownGenerator = new MarkdownReportGenerator(fileIconService, fileSystem);
     }
 
     @Override
