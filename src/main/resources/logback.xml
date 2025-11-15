@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Аппендер для вывода в консоль -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!-- Формат сообщения в логе -->
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -- %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Корневой логгер (уровень INFO по умолчанию) -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+    </root>
+
+    <!-- Логгер для PathMatcherUtil (уровень TRACE) -->
+    <logger name="com.example.auditor.utils" level="TRACE" />
+
+    <!-- Опционально: можно также включить TRACE для других пакетов, если нужно -->
+    <!-- <logger name="com.example.auditor.analysis" level="TRACE" /> -->
+
+</configuration>
