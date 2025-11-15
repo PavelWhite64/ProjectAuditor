@@ -1,12 +1,11 @@
 package com.example.auditor.analysis;
 
+import com.example.auditor.core.FileTypeClassifier;
 import com.example.auditor.core.ProjectScanner;
 import com.example.auditor.model.FileInfo;
-import com.example.auditor.utils.ProgressBar;
-import com.example.auditor.utils.FileTypeClassifier;
-import com.example.auditor.utils.SecurityUtils;
+import com.example.auditor.utils.ConsoleProgressIndicator;
 import com.example.auditor.utils.FileExtensionUtils;
-import com.example.auditor.utils.FileExtensionUtils.ExtensionFormat;
+import com.example.auditor.utils.SecurityUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -30,12 +29,18 @@ public class FileScannerImpl implements ProjectScanner {
     private static volatile Set<String> ignoredDirectories = null;
     private static final Object lock = new Object(); // Объект для синхронизации
 
+    private final FileTypeClassifier fileTypeClassifier;
+
+    public FileScannerImpl(FileTypeClassifier fileTypeClassifier) {
+        this.fileTypeClassifier = fileTypeClassifier;
+    }
+
     @Override
     public List<FileInfo> scan(Path projectPath) throws IOException {
         List<FileInfo> files = new ArrayList<>();
 
         // Прогресс-бар инициализируется, но обновляется только при фактическом добавлении файлов
-        ProgressBar progressBar = new ProgressBar("Сканирование файлов", 100); // Временно 100, точное количество будет обновляться
+        ConsoleProgressIndicator progressBar = new ConsoleProgressIndicator("Сканирование файлов", 100);
         AtomicInteger processed = new AtomicInteger(0);
 
         // Используем SimpleFileVisitor для обхода дерева файлов
@@ -79,8 +84,9 @@ public class FileScannerImpl implements ProjectScanner {
                                 filePath.getFileName().toString(),
                                 relativePath,
                                 attrs.size(),
-                                FileExtensionUtils.getExtension(filePath.getFileName().toString(), ExtensionFormat.WITHOUT_DOT),
-                                FileTypeClassifier.classify(filePath.getFileName().toString())
+                                FileExtensionUtils.getExtension(filePath.getFileName().toString(),
+                                        FileExtensionUtils.ExtensionFormat.WITHOUT_DOT),
+                                fileTypeClassifier.classify(filePath.getFileName().toString()) // Используем инжектированный классификатор
                         );
                         files.add(fileInfo);
                     } catch (Exception e) {

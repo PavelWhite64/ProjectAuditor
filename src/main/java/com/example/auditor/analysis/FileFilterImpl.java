@@ -2,11 +2,12 @@ package com.example.auditor.analysis;
 
 import com.example.auditor.config.FilterConfiguration;
 import com.example.auditor.core.FileFilter;
+import com.example.auditor.core.ProgressIndicator;
 import com.example.auditor.model.AnalysisConfig;
 import com.example.auditor.model.FileInfo;
+import com.example.auditor.utils.ConsoleProgressIndicator;
 import com.example.auditor.utils.GitIgnoreParser;
 import com.example.auditor.utils.PathMatcherUtil;
-import com.example.auditor.utils.ProgressBar;
 import com.example.auditor.utils.FileExtensionUtils;
 import com.example.auditor.utils.FileExtensionUtils.ExtensionFormat;
 import org.slf4j.Logger;
@@ -43,11 +44,12 @@ public class FileFilterImpl implements FileFilter {
         long maxFileSizeBytes = config.getMaxFileSizeKB() > 0 ? config.getMaxFileSizeKB() * 1024L : -1;
 
         List<FileInfo> filteredFiles = new ArrayList<>();
-        ProgressBar progressBar = new ProgressBar("Фильтрация файлов", files.size());
+        // ИСПРАВЛЕНО: Используем ProgressIndicator вместо ProgressBar
+        ProgressIndicator progressIndicator = new ConsoleProgressIndicator("Фильтрация файлов", files.size());
         int processed = 0;
 
         for (FileInfo file : files) {
-            progressBar.update(processed++);
+            progressIndicator.update(processed++);
 
             LOGGER.debug("Processing file: {} (Extension: {}, Size: {} bytes, Type: {})",
                     file.getRelativePath(), file.getExtension(), file.getLength(), file.getType());
@@ -59,7 +61,6 @@ public class FileFilterImpl implements FileFilter {
             }
 
             // 2. Быстрая проверка расширения файла (до сложных паттернов)
-            // ИСПРАВЛЕНИЕ: Используем FileExtensionUtils вместо старого метода
             String extension = FileExtensionUtils.getExtension(file.getName(), ExtensionFormat.WITH_DOT);
             LOGGER.debug("Checking extension '{}' for file '{}'", extension, file.getRelativePath());
 
@@ -88,7 +89,7 @@ public class FileFilterImpl implements FileFilter {
             filteredFiles.add(file);
         }
 
-        progressBar.finish();
+        progressIndicator.finish();
         LOGGER.debug("Filtered {} files out of {} total.", filteredFiles.size(), files.size());
         return filteredFiles;
     }

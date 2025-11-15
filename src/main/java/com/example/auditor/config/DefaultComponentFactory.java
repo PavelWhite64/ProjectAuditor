@@ -6,6 +6,9 @@ import com.example.auditor.analysis.FileScannerImpl;
 import com.example.auditor.core.*;
 import com.example.auditor.reporting.ReportGeneratorImpl;
 import com.example.auditor.ui.InteractivePrompter;
+import com.example.auditor.utils.ConsoleProgressIndicator;
+import com.example.auditor.utils.DefaultFileIconService;
+import com.example.auditor.utils.DefaultFileTypeClassifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +31,8 @@ public class DefaultComponentFactory implements ComponentFactory {
     @Override
     public ProjectScanner createProjectScanner() {
         LOGGER.debug("Creating ProjectScanner (FileScannerImpl)");
-        return new FileScannerImpl();
+        FileTypeClassifier fileTypeClassifier = createFileTypeClassifier();
+        return new FileScannerImpl(fileTypeClassifier);
     }
 
     @Override
@@ -48,13 +52,38 @@ public class DefaultComponentFactory implements ComponentFactory {
     @Override
     public ReportGenerator createReportGenerator() {
         LOGGER.debug("Creating ReportGenerator (ReportGeneratorImpl)");
-        return new ReportGeneratorImpl();
+        FileIconService fileIconService = createFileIconService();
+        return new ReportGeneratorImpl(fileIconService);
     }
 
     @Override
     public UserInterface createUserInterface() {
         LOGGER.debug("Creating UserInterface (InteractivePrompter)");
         return new InteractivePrompter(getOrCreateScanner());
+    }
+
+    /**
+     * Создает индикатор прогресса
+     */
+    public ProgressIndicator createProgressIndicator(String taskName, int totalSteps) {
+        LOGGER.debug("Creating ProgressIndicator for task: {}", taskName);
+        return new ConsoleProgressIndicator(taskName, totalSteps);
+    }
+
+    /**
+     * Создает классификатор типов файлов
+     */
+    public FileTypeClassifier createFileTypeClassifier() {
+        LOGGER.debug("Creating FileTypeClassifier");
+        return new DefaultFileTypeClassifier();
+    }
+
+    /**
+     * Создает сервис иконок файлов
+     */
+    public FileIconService createFileIconService() {
+        LOGGER.debug("Creating FileIconService");
+        return new DefaultFileIconService();
     }
 
     private Scanner getOrCreateScanner() {

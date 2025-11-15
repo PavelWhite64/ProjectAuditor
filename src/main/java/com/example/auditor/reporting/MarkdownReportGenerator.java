@@ -1,8 +1,7 @@
 package com.example.auditor.reporting;
 
-import com.example.auditor.model.AnalysisResult;
+import com.example.auditor.core.FileIconService;
 import com.example.auditor.model.FileInfo;
-import com.example.auditor.utils.FileIcon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,7 +10,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path; // Добавлен импорт Path
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -19,6 +18,12 @@ import java.util.stream.Collectors;
 public class MarkdownReportGenerator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MarkdownReportGenerator.class);
+
+    private final FileIconService fileIconService;
+
+    public MarkdownReportGenerator(FileIconService fileIconService) {
+        this.fileIconService = fileIconService;
+    }
 
     // Метод generate теперь принимает Path projectPath
     public void generate(List<FileInfo> files, String projectName, String projectType, boolean lightMode, Path projectPath, String outputFile) {
@@ -48,24 +53,23 @@ public class MarkdownReportGenerator {
             // Структура
             writer.write("## Структура проекта\n");
             writer.write("```\n");
-            writer.write(ReportUtils.generateTreeMarkdown(files));
+            writer.write(ReportUtils.generateTreeMarkdown(files, fileIconService));
             writer.write("```\n");
 
             // Содержимое файлов (если не Light режим)
             if (!lightMode) {
                 writer.write("\n## Содержимое файлов\n");
                 for (FileInfo file : files) {
-                    String icon = FileIcon.getIcon(file.getExtension());
-                    String language = FileIcon.getLanguage(file.getExtension());
+                    String icon = fileIconService.getIcon(file.getExtension());
+                    String language = fileIconService.getLanguage(file.getExtension());
                     double kb = file.getLength() / 1024.0;
                     String warning = "";
-                    if (kb > 50) { // Пример: предупреждение для файлов > 50KB
+                    if (kb > 50) {
                         warning = "  > **Примечание:** Файл большого размера (" + String.format("%.0f", kb) + " KB). LLM может пропустить часть контента.\n\n";
                     }
                     writer.write("\n" + warning + "### " + icon + " " + escapeMarkdown(file.getRelativePath()) + " (`" + String.format("%.1f", kb) + " KB`)\n");
                     writer.write("```" + language + "\n");
                     try {
-                        // Используем обновлённый метод readFileContent с проверкой безопасности
                         String content = ReportUtils.readFileContent(file.getFullName(), projectPath);
                         writer.write(content.trim() + "\n");
                     } catch (IOException e) {
@@ -87,11 +91,11 @@ public class MarkdownReportGenerator {
             writer.write("  > ВАЖНО: Сфокусируйся на критических проблемах безопасности!\n");
 
         } catch (IOException e) {
-            LOGGER.error("Ошибка при записи Markdown отчета: {}", e.getMessage(), e); // Логируем с трейсом
+            LOGGER.error("Ошибка при записи Markdown отчета: {}", e.getMessage(), e);
         }
     }
 
-    // Вспомогательный метод для экранирования (может быть статическим в ReportUtils, но оставим тут для примера)
+    // Вспомогательный метод для экранирования
     private String escapeMarkdown(String input) {
         return ReportUtils.escapeMarkdown(input);
     }
