@@ -11,6 +11,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path; // Добавлен импорт Path
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -20,7 +21,8 @@ public class HtmlReportGenerator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HtmlReportGenerator.class);
 
-    public void generate(List<FileInfo> files, String projectName, String projectType, boolean lightMode, String outputFile) {
+    // Метод generate теперь принимает Path projectPath
+    public void generate(List<FileInfo> files, String projectName, String projectType, boolean lightMode, Path projectPath, String outputFile) {
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), StandardCharsets.UTF_8))) {
             String currentDate = ReportUtils.getCurrentDate();
             long totalSizeKB = files.stream().mapToLong(FileInfo::getLength).sum() / 1024;
@@ -29,7 +31,7 @@ public class HtmlReportGenerator {
             writer.write("<!DOCTYPE html>\n<html lang=\"ru\">\n<head>\n");
             writer.write("<meta charset=\"UTF-8\">\n");
             writer.write("<title>Аудит проекта: " + ReportUtils.escapeHtml(projectName) + "</title>\n");
-            writer.write("<style>\n");
+            writer.write("<style>\n"); // Простая стилизация
             writer.write("body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }\n");
             writer.write(".header { background-color: #007acc; color: white; padding: 15px; border-radius: 5px; }\n");
             writer.write(".section { margin: 20px 0; background-color: white; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }\n");
@@ -68,7 +70,8 @@ public class HtmlReportGenerator {
                     writer.write("<h3>" + icon + " " + ReportUtils.escapeHtml(file.getRelativePath()) + " (" + String.format("%.1f", kb) + " KB)</h3>\n");
                     writer.write("<pre><code class=\"" + ReportUtils.escapeHtml(language) + "\">\n");
                     try {
-                        String content = ReportUtils.escapeHtml(ReportUtils.readFileContent(file.getFullName())).trim();
+                        // Используем обновлённый метод readFileContent с проверкой безопасности
+                        String content = ReportUtils.escapeHtml(ReportUtils.readFileContent(file.getFullName(), projectPath)).trim();
                         writer.write(content);
                     } catch (IOException e) {
                         writer.write(" <!-- Ошибка чтения файла --> ");
@@ -91,7 +94,7 @@ public class HtmlReportGenerator {
             writer.write("</body>\n</html>");
 
         } catch (IOException e) {
-            LOGGER.error("Ошибка при записи HTML отчета: {}", e.getMessage(), e);
+            LOGGER.error("Ошибка при записи HTML отчета: {}", e.getMessage(), e); // Логируем с трейсом
         }
     }
 }

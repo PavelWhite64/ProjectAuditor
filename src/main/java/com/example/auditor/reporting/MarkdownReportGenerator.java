@@ -11,6 +11,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path; // Добавлен импорт Path
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -19,7 +20,8 @@ public class MarkdownReportGenerator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MarkdownReportGenerator.class);
 
-    public void generate(List<FileInfo> files, String projectName, String projectType, boolean lightMode, String outputFile) {
+    // Метод generate теперь принимает Path projectPath
+    public void generate(List<FileInfo> files, String projectName, String projectType, boolean lightMode, Path projectPath, String outputFile) {
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), StandardCharsets.UTF_8))) {
             String currentDate = ReportUtils.getCurrentDate();
             long totalSizeKB = files.stream().mapToLong(FileInfo::getLength).sum() / 1024;
@@ -57,13 +59,14 @@ public class MarkdownReportGenerator {
                     String language = FileIcon.getLanguage(file.getExtension());
                     double kb = file.getLength() / 1024.0;
                     String warning = "";
-                    if (kb > 50) {
+                    if (kb > 50) { // Пример: предупреждение для файлов > 50KB
                         warning = "  > **Примечание:** Файл большого размера (" + String.format("%.0f", kb) + " KB). LLM может пропустить часть контента.\n\n";
                     }
-                    writer.write("\n" + warning + "### " + icon + " " + ReportUtils.escapeMarkdown(file.getRelativePath()) + " (`" + String.format("%.1f", kb) + " KB`)\n");
+                    writer.write("\n" + warning + "### " + icon + " " + escapeMarkdown(file.getRelativePath()) + " (`" + String.format("%.1f", kb) + " KB`)\n");
                     writer.write("```" + language + "\n");
                     try {
-                        String content = ReportUtils.readFileContent(file.getFullName());
+                        // Используем обновлённый метод readFileContent с проверкой безопасности
+                        String content = ReportUtils.readFileContent(file.getFullName(), projectPath);
                         writer.write(content.trim() + "\n");
                     } catch (IOException e) {
                         writer.write(" <!-- Ошибка чтения файла -->\n");
@@ -84,7 +87,12 @@ public class MarkdownReportGenerator {
             writer.write("  > ВАЖНО: Сфокусируйся на критических проблемах безопасности!\n");
 
         } catch (IOException e) {
-            LOGGER.error("Ошибка при записи Markdown отчета: {}", e.getMessage(), e);
+            LOGGER.error("Ошибка при записи Markdown отчета: {}", e.getMessage(), e); // Логируем с трейсом
         }
+    }
+
+    // Вспомогательный метод для экранирования (может быть статическим в ReportUtils, но оставим тут для примера)
+    private String escapeMarkdown(String input) {
+        return ReportUtils.escapeMarkdown(input);
     }
 }
