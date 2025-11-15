@@ -37,15 +37,15 @@ public class ReportUtils {
                 .replace("]", "\\]")
                 .replace("`", "\\`")
                 .replace("#", "\\#")
-                .replace("<", "<")
-                .replace(">", ">");
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 
     public static String escapeHtml(String input) {
         if (input == null) return "";
         return input.replace("&", "&amp;")
-                .replace("<", "<")
-                .replace(">", ">")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
                 .replace("\"", "&quot;")
                 .replace("'", "&#x27;");
     }
