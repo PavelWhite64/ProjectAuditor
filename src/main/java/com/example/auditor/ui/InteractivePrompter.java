@@ -1,4 +1,3 @@
-// src/main/java/com/example/auditor/ui/InteractivePrompter.java
 package com.example.auditor.ui;
 
 import com.example.auditor.core.UserInterface;
@@ -7,39 +6,44 @@ import com.example.auditor.utils.ConsoleColors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Console;
+import java.io.BufferedReader;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Scanner; // Импортируем Scanner
 
 /**
  * Implementation of UserInterface, providing an interactive text interface
  * for obtaining analysis configuration from the user.
- * Uses a provided Scanner for input, obtained either from System.console() or System.in.
+ * Uses BufferedReader with explicit UTF-8 encoding for proper Unicode support.
  */
-public class InteractivePrompter implements UserInterface {
-
+public class InteractivePrompter implements UserInterface, Closeable {
     private static final Logger LOGGER = LoggerFactory.getLogger(InteractivePrompter.class);
 
-    private final Scanner scanner; // Scanner внедряется через конструктор
+    private final BufferedReader reader;
+    private boolean closed = false;
 
-    // Конструктор принимает Scanner
-    public InteractivePrompter(Scanner scanner) {
-        if (scanner == null) {
-            throw new IllegalArgumentException("Scanner cannot be null");
-        }
-        this.scanner = scanner;
+    // Конструктор принимает InputStream для гибкости (тесты, разные источники ввода)
+    public InteractivePrompter(InputStream inputStream) {
+        this.reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
     }
 
     @Override
     public AnalysisConfig getUserConfig() {
+        if (closed) {
+            throw new IllegalStateException("InteractivePrompter is closed");
+        }
+
         System.out.println(ConsoleColors.CYAN + "\n--- PROJECT AUDITOR SETUP ---" + ConsoleColors.RESET);
 
         // STEP 1: PROJECT SELECTION
         System.out.println(ConsoleColors.CYAN + "\nSTEP 1: PROJECT SELECTION " + ConsoleColors.RESET);
-        String projectPathStr = readLine("Enter path to project: ", "project-audit ");
+        String projectPathStr = readLine("Enter path to project [default: current directory]: ", ".");
         while (projectPathStr.isEmpty()) {
-            projectPathStr = readLine("Path cannot be empty. Please re-enter: ", "project-audit ");
+            projectPathStr = readLine("Path cannot be empty. Please re-enter: ", ".");
         }
         Path projectPath = Paths.get(projectPathStr).toAbsolutePath().normalize();
         System.out.println(" -> Selected project: " + projectPath);
@@ -48,7 +52,7 @@ public class InteractivePrompter implements UserInterface {
         System.out.println(ConsoleColors.CYAN + "\nSTEP 2: OUTPUT CONFIGURATION " + ConsoleColors.RESET);
         AnalysisConfig.OutputFormat outputFormat = getOutputFormat();
         String outputFileName = getOutputFileName();
-        boolean generateJsonMetadata = readYesNo("Generate JSON metadata file? ", true);
+        boolean generateJsonMetadata = readYesNo("Generate JSON metadata file? ", false);
         boolean openResultsAfterwards = readYesNo("Open results after completion? ", true);
 
         // STEP 3: FILTERING SETTINGS
@@ -58,11 +62,10 @@ public class InteractivePrompter implements UserInterface {
 
         // STEP 4: ADDITIONAL OPTIONS
         System.out.println(ConsoleColors.CYAN + "\nSTEP 4: ADDITIONAL OPTIONS " + ConsoleColors.RESET);
-        boolean lightMode = outputFormat == AnalysisConfig.OutputFormat.STRUCTURE_ONLY; // Set lightMode based on format
+        boolean lightMode = outputFormat == AnalysisConfig.OutputFormat.STRUCTURE_ONLY;
         if (outputFormat != AnalysisConfig.OutputFormat.STRUCTURE_ONLY) {
             lightMode = readYesNo("Use 'Structure Only' mode (ignores file contents)? ", false);
         }
-
 
         // STEP 5: SETTINGS CONFIRMATION
         System.out.println(ConsoleColors.CYAN + "\nSTEP 5: SETTINGS CONFIRMATION " + ConsoleColors.RESET);
@@ -70,7 +73,7 @@ public class InteractivePrompter implements UserInterface {
         System.out.println(" • Project: " + projectPath);
         System.out.println(" • Output Format: " + outputFormat);
         System.out.println(" • Output File Name: " + outputFileName);
-        System.out.println(" • JSON Meta " + (generateJsonMetadata ? "Yes" : "No"));
+        System.out.println(" • JSON Metadata: " + (generateJsonMetadata ? "Yes" : "No"));
         System.out.println(" • Open After Completion: " + (openResultsAfterwards ? "Yes" : "No"));
         System.out.println(" • Use .gitignore: " + (useGitIgnore ? "Yes" : "No"));
         System.out.println(" • Max File Size: " + maxFileSizeKB + " KB");
@@ -80,11 +83,9 @@ public class InteractivePrompter implements UserInterface {
 
         if (!confirm) {
             System.out.println(ConsoleColors.RED + "Settings rejected by user. Exiting. " + ConsoleColors.RESET);
-            System.exit(0); // Or throw an exception if logic allows
+            System.exit(0);
         }
 
-        // Return the built configuration object
-        // Exclude patterns are empty for now, can be added later if console input is needed
         return new AnalysisConfig(
                 projectPath,
                 outputFormat,
@@ -93,7 +94,7 @@ public class InteractivePrompter implements UserInterface {
                 openResultsAfterwards,
                 useGitIgnore,
                 maxFileSizeKB,
-                java.util.List.of(), // Currently fixed list
+                java.util.List.of(),
                 lightMode
         );
     }
@@ -111,7 +112,7 @@ public class InteractivePrompter implements UserInterface {
             case 2: return AnalysisConfig.OutputFormat.HTML;
             case 3: return AnalysisConfig.OutputFormat.BOTH;
             case 4: return AnalysisConfig.OutputFormat.STRUCTURE_ONLY;
-            default: return AnalysisConfig.OutputFormat.MARKDOWN; // Fallback
+            default: return AnalysisConfig.OutputFormat.MARKDOWN;
         }
     }
 
@@ -120,36 +121,39 @@ public class InteractivePrompter implements UserInterface {
     }
 
     private long getMaxFileSizeKB() {
-        String input = readLine("Maximum file size to include (in KB, 0 = no limit) [default 50000]: ", "50000");
+        String input = readLine("Maximum file size to include (in KB, 0 = no limit) [default: 50000]: ", "50000");
         try {
             long size = Long.parseLong(input);
-            if (size < 0) {
-                System.out.println("Size cannot be negative, using 0 (no limit). ");
-                return 0; // Возвращаем 0 для "без ограничений"
-            }
-            // Если пользователь ввел 0, оставляем 0. Если ввел > 0, оставляем как есть.
-            return size; // Просто возвращаем введённое значение
+            return Math.max(0, size);
         } catch (NumberFormatException e) {
             System.out.println("Invalid input, using default value 50000 KB. ");
-            return 50000; // Значение по умолчанию
+            return 50000;
         }
     }
 
-    // --- Generic input methods using the provided Scanner ---
+    // --- Generic input methods using BufferedReader ---
     private String readLine(String prompt, String defaultVal) {
-        // Use the provided scanner
-        System.out.print(prompt);
-        String input = scanner.nextLine();
-        if (input == null || input.trim().isEmpty()) {
-            input = defaultVal;
+        if (closed) {
+            return defaultVal;
         }
-        return input.trim();
+
+        System.out.print(prompt);
+        try {
+            String input = reader.readLine();
+            if (input == null || input.trim().isEmpty()) {
+                return defaultVal;
+            }
+            return input.trim();
+        } catch (IOException e) {
+            LOGGER.warn("Error reading input, using default value: {}", defaultVal, e);
+            return defaultVal;
+        }
     }
 
     private int readInt(String prompt, int min, int max) {
         int value;
         while (true) {
-            String input = readLine(prompt, String.valueOf(min)); // Suggest min as "default" for convenience
+            String input = readLine(prompt, String.valueOf(min));
             try {
                 value = Integer.parseInt(input);
                 if (value >= min && value <= max) {
@@ -165,10 +169,22 @@ public class InteractivePrompter implements UserInterface {
     }
 
     private boolean readYesNo(String prompt, boolean defaultYes) {
-        String input = readLine(prompt + (defaultYes ? " [Y/n]: " : " [y/N]: "), " ");
+        String input = readLine(prompt + (defaultYes ? " [Y/n]: " : " [y/N]: "), "");
         if (input.isEmpty()) {
             return defaultYes;
         }
-        return input.trim().toLowerCase().startsWith("y"); // Accept "y", "yes", "Y", "Yes", ...
+        return input.trim().toLowerCase().startsWith("y");
+    }
+
+    @Override
+    public void close() {
+        if (!closed) {
+            closed = true;
+            try {
+                reader.close();
+            } catch (IOException e) {
+                LOGGER.debug("Error closing reader", e);
+            }
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.example.auditor.runner;
 import com.example.auditor.config.ComponentFactory;
 import com.example.auditor.core.ProjectAnalyzer;
 import com.example.auditor.core.ReportGenerator;
+import com.example.auditor.core.UserInterface;
 import com.example.auditor.model.AnalysisConfig;
 import com.example.auditor.model.AnalysisResult;
 import com.example.auditor.service.UserConfigService;
@@ -14,10 +15,9 @@ import java.nio.file.Path;
 
 /**
  * Основной класс для запуска и координации работы приложения.
- * Заменяет логику, ранее находившуюся в Main и ApplicationConfig.
+ * Теперь корректно управляет ресурсами UserInterface.
  */
 public class ApplicationRunner {
-
     private static final Logger LOGGER = LoggerFactory.getLogger(ApplicationRunner.class);
 
     private final ComponentFactory componentFactory;
@@ -31,7 +31,8 @@ public class ApplicationRunner {
     public void run() {
         System.out.println(ConsoleColors.CYAN + "🚀 Запуск Project Auditor v1.0... " + ConsoleColors.RESET);
 
-        try {
+        // Используем try-with-resources для гарантированного закрытия UserInterface
+        try (UserInterface userInterface = componentFactory.createUserInterface()) {
             // 1. Получаем конфигурацию от пользователя
             System.out.println("Получение настроек анализа... ");
             AnalysisConfig userConfig = userConfigService.getUserConfig();

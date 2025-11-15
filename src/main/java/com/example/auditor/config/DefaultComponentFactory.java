@@ -14,17 +14,15 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 
 /**
  * Реализация фабрики компонентов с явным созданием зависимостей.
+ * Теперь создает InteractivePrompter с правильной кодировкой.
  */
 public class DefaultComponentFactory implements ComponentFactory {
-
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultComponentFactory.class);
 
     private final FilterConfiguration filterConfiguration;
-    private Scanner scanner;
 
     public DefaultComponentFactory() {
         this.filterConfiguration = loadFilterConfiguration();
@@ -67,7 +65,8 @@ public class DefaultComponentFactory implements ComponentFactory {
     @Override
     public UserInterface createUserInterface() {
         LOGGER.debug("Creating UserInterface (InteractivePrompter)");
-        return new InteractivePrompter(getOrCreateScanner());
+        // Теперь передаем System.in напрямую, кодировка устанавливается в конструкторе InteractivePrompter
+        return new InteractivePrompter(System.in);
     }
 
     /**
@@ -92,13 +91,6 @@ public class DefaultComponentFactory implements ComponentFactory {
     public FileIconService createFileIconService() {
         LOGGER.debug("Creating FileIconService");
         return new DefaultFileIconService();
-    }
-
-    private Scanner getOrCreateScanner() {
-        if (scanner == null) {
-            scanner = new Scanner(System.in);
-        }
-        return scanner;
     }
 
     private FilterConfiguration loadFilterConfiguration() {

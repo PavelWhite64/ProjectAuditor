@@ -5,10 +5,9 @@ import com.example.auditor.model.AnalysisConfig;
 
 /**
  * Сервис для получения конфигурации анализа от пользователя.
- * Выносим логику работы с пользовательским вводом из ApplicationConfig.
+ * Теперь работает с AutoCloseable UserInterface.
  */
 public class UserConfigService {
-
     private final UserInterface userInterface;
 
     public UserConfigService(UserInterface userInterface) {
