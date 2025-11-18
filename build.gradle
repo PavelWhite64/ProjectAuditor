@@ -5,6 +5,7 @@ plugins {
     id 'application' // Плагин для создания исполняемого приложения
     id 'com.github.johnrengelman.shadow' version '8.1.1' // Плагин для создания "толстого" JAR (включает все зависимости)
     id 'jacoco' // Плагин для покрытия кода тестами
+    id 'com.diffplug.spotless' version '6.25.0'
 }
 
 // Основная информация о проекте
@@ -83,6 +84,24 @@ compileJava {
 
 compileTestJava {
     options.encoding = 'UTF-8'
+}
+
+spotless {
+    java {
+        // Используем google-java-format
+        googleJavaFormat('1.19.2') // Укажите желаемую версию google-java-format
+        // Или, если вы хотите использовать ту же версию, что и в Checkstyle (если применимо)
+        // googleJavaFormat() // Возьмет версию по умолчанию для текущей версии Spotless
+
+        // Убедитесь, что файлы заканчиваются одной пустой строкой
+        endWithNewline()
+        // Убедитесь, что в файлах используются только пробелы, а не табы (если это требование Google Style)
+        indentWithSpaces(2) // Google Java Style требует 2 пробела
+        // Удаляет лишние пробелы в конце строк
+        trimTrailingWhitespace()
+    }
+    // (Опционально) Применить форматирование как часть задачи check
+    // check.dependsOn spotlessCheck
 }
 
 // Убедимся, что задача shadowJar зависит от build

@@ -9,107 +9,99 @@ import com.example.auditor.ui.InteractivePrompter;
 import com.example.auditor.utils.ConsoleProgressIndicator;
 import com.example.auditor.utils.DefaultFileIconService;
 import com.example.auditor.utils.DefaultFileTypeClassifier;
+import java.util.ArrayList;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * Реализация фабрики компонентов с явным созданием зависимостей.
- * Теперь создает InteractivePrompter с правильной кодировкой и FileSystem.
+ * Реализация фабрики компонентов с явным созданием зависимостей. Теперь создает InteractivePrompter
+ * с правильной кодировкой и FileSystem.
  */
 public class DefaultComponentFactory implements ComponentFactory {
-    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultComponentFactory.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultComponentFactory.class);
 
-    private final FilterConfiguration filterConfiguration;
+  private final FilterConfiguration filterConfiguration;
 
-    public DefaultComponentFactory() {
-        this.filterConfiguration = loadFilterConfiguration();
+  public DefaultComponentFactory() {
+    this.filterConfiguration = loadFilterConfiguration();
+  }
+
+  @Override
+  public ProjectScanner createProjectScanner() {
+    LOGGER.debug("Creating ProjectScanner (FileScannerImpl)");
+    FileTypeClassifier fileTypeClassifier = createFileTypeClassifier();
+    FileSystem fileSystem = createFileSystem();
+    return new FileScannerImpl(fileTypeClassifier, fileSystem);
+  }
+
+  @Override
+  public FileFilter createFileFilter() {
+    LOGGER.debug("Creating FileFilter (FileFilterImpl)");
+    return new FileFilterImpl(filterConfiguration);
+  }
+
+  @Override
+  public ProjectAnalyzer createProjectAnalyzer() {
+    LOGGER.debug("Creating ProjectAnalyzer (DefaultProjectAnalyzer)");
+    ProjectScanner scanner = createProjectScanner();
+    FileFilter filter = createFileFilter();
+    return new DefaultProjectAnalyzer(scanner, filter);
+  }
+
+  @Override
+  public ReportGenerator createReportGenerator() {
+    LOGGER.debug("Creating CompositeReportGenerator with strategies");
+    FileIconService fileIconService = createFileIconService();
+    FileSystem fileSystem = createFileSystem();
+
+    List<ReportStrategy> strategies = new ArrayList<>();
+    strategies.add(new MarkdownReportStrategy(fileIconService, fileSystem));
+    strategies.add(new HtmlReportStrategy(fileIconService, fileSystem));
+    strategies.add(new JsonReportStrategy(fileIconService));
+
+    return new CompositeReportGenerator(strategies);
+  }
+
+  @Override
+  public UserInterface createUserInterface() {
+    LOGGER.debug("Creating UserInterface (InteractivePrompter)");
+    // Теперь передаем System.in напрямую, кодировка устанавливается в конструкторе
+    // InteractivePrompter
+    return new InteractivePrompter(System.in);
+  }
+
+  /** Создает индикатор прогресса */
+  public ProgressIndicator createProgressIndicator(String taskName, int totalSteps) {
+    LOGGER.debug("Creating ProgressIndicator for task: {}", taskName);
+    return new ConsoleProgressIndicator(taskName, totalSteps);
+  }
+
+  /** Создает классификатор типов файлов */
+  public FileTypeClassifier createFileTypeClassifier() {
+    LOGGER.debug("Creating FileTypeClassifier");
+    return new DefaultFileTypeClassifier();
+  }
+
+  /** Создает сервис иконок файлов */
+  public FileIconService createFileIconService() {
+    LOGGER.debug("Creating FileIconService");
+    return new DefaultFileIconService();
+  }
+
+  /** Создает файловую систему */
+  public FileSystem createFileSystem() {
+    LOGGER.debug("Creating FileSystem (DefaultFileSystem)");
+    return new DefaultFileSystem();
+  }
+
+  private FilterConfiguration loadFilterConfiguration() {
+    LOGGER.debug("Loading FilterConfiguration from resource");
+    try {
+      return JsonFilterConfiguration.loadFromJsonResource("/filter-config.json");
+    } catch (Exception e) {
+      LOGGER.error("Failed to load FilterConfiguration: {}", e.getMessage(), e);
+      throw new RuntimeException("Cannot start without FilterConfiguration", e);
     }
-
-    @Override
-    public ProjectScanner createProjectScanner() {
-        LOGGER.debug("Creating ProjectScanner (FileScannerImpl)");
-        FileTypeClassifier fileTypeClassifier = createFileTypeClassifier();
-        FileSystem fileSystem = createFileSystem();
-        return new FileScannerImpl(fileTypeClassifier, fileSystem);
-    }
-
-    @Override
-    public FileFilter createFileFilter() {
-        LOGGER.debug("Creating FileFilter (FileFilterImpl)");
-        return new FileFilterImpl(filterConfiguration);
-    }
-
-    @Override
-    public ProjectAnalyzer createProjectAnalyzer() {
-        LOGGER.debug("Creating ProjectAnalyzer (DefaultProjectAnalyzer)");
-        ProjectScanner scanner = createProjectScanner();
-        FileFilter filter = createFileFilter();
-        return new DefaultProjectAnalyzer(scanner, filter);
-    }
-
-    @Override
-    public ReportGenerator createReportGenerator() {
-        LOGGER.debug("Creating CompositeReportGenerator with strategies");
-        FileIconService fileIconService = createFileIconService();
-        FileSystem fileSystem = createFileSystem();
-
-        List<ReportStrategy> strategies = new ArrayList<>();
-        strategies.add(new MarkdownReportStrategy(fileIconService, fileSystem));
-        strategies.add(new HtmlReportStrategy(fileIconService, fileSystem));
-        strategies.add(new JsonReportStrategy(fileIconService));
-
-        return new CompositeReportGenerator(strategies);
-    }
-
-    @Override
-    public UserInterface createUserInterface() {
-        LOGGER.debug("Creating UserInterface (InteractivePrompter)");
-        // Теперь передаем System.in напрямую, кодировка устанавливается в конструкторе InteractivePrompter
-        return new InteractivePrompter(System.in);
-    }
-
-    /**
-     * Создает индикатор прогресса
-     */
-    public ProgressIndicator createProgressIndicator(String taskName, int totalSteps) {
-        LOGGER.debug("Creating ProgressIndicator for task: {}", taskName);
-        return new ConsoleProgressIndicator(taskName, totalSteps);
-    }
-
-    /**
-     * Создает классификатор типов файлов
-     */
-    public FileTypeClassifier createFileTypeClassifier() {
-        LOGGER.debug("Creating FileTypeClassifier");
-        return new DefaultFileTypeClassifier();
-    }
-
-    /**
-     * Создает сервис иконок файлов
-     */
-    public FileIconService createFileIconService() {
-        LOGGER.debug("Creating FileIconService");
-        return new DefaultFileIconService();
-    }
-
-    /**
-     * Создает файловую систему
-     */
-    public FileSystem createFileSystem() {
-        LOGGER.debug("Creating FileSystem (DefaultFileSystem)");
-        return new DefaultFileSystem();
-    }
-
-    private FilterConfiguration loadFilterConfiguration() {
-        LOGGER.debug("Loading FilterConfiguration from resource");
-        try {
-            return JsonFilterConfiguration.loadFromJsonResource("/filter-config.json");
-        } catch (Exception e) {
-            LOGGER.error("Failed to load FilterConfiguration: {}", e.getMessage(), e);
-            throw new RuntimeException("Cannot start without FilterConfiguration", e);
-        }
-    }
+  }
 }

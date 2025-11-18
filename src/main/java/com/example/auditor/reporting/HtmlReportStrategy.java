@@ -6,64 +6,68 @@ import com.example.auditor.core.ReportStrategy;
 import com.example.auditor.model.AnalysisConfig;
 import com.example.auditor.model.AnalysisResult;
 import com.example.auditor.model.FileInfo;
+import java.nio.file.Path;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
-import java.util.List;
-
-/**
- * Стратегия генерации HTML отчетов
- */
+/** Стратегия генерации HTML отчетов */
 public class HtmlReportStrategy implements ReportStrategy {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(HtmlReportStrategy.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(HtmlReportStrategy.class);
 
-    private final FileIconService fileIconService;
-    private final FileSystem fileSystem;
-    private final HtmlReportGenerator htmlGenerator;
+  private final FileIconService fileIconService;
+  private final FileSystem fileSystem;
+  private final HtmlReportGenerator htmlGenerator;
 
-    // Новый конструктор с FileSystem
-    public HtmlReportStrategy(FileIconService fileIconService, FileSystem fileSystem) {
-        this.fileIconService = fileIconService;
-        this.fileSystem = fileSystem;
-        this.htmlGenerator = new HtmlReportGenerator(fileIconService, fileSystem);
-    }
+  // Новый конструктор с FileSystem
+  public HtmlReportStrategy(FileIconService fileIconService, FileSystem fileSystem) {
+    this.fileIconService = fileIconService;
+    this.fileSystem = fileSystem;
+    this.htmlGenerator = new HtmlReportGenerator(fileIconService, fileSystem);
+  }
 
-    // Старый конструктор для обратной совместимости
-    public HtmlReportStrategy(FileIconService fileIconService) {
-        this(fileIconService, new com.example.auditor.core.DefaultFileSystem());
-    }
+  // Старый конструктор для обратной совместимости
+  public HtmlReportStrategy(FileIconService fileIconService) {
+    this(fileIconService, new com.example.auditor.core.DefaultFileSystem());
+  }
 
-    @Override
-    public boolean supports(AnalysisConfig.OutputFormat format) {
-        return format == AnalysisConfig.OutputFormat.HTML ||
-                format == AnalysisConfig.OutputFormat.BOTH;
-    }
+  @Override
+  public boolean supports(AnalysisConfig.OutputFormat format) {
+    return format == AnalysisConfig.OutputFormat.HTML || format == AnalysisConfig.OutputFormat.BOTH;
+  }
 
-    @Override
-    public void generateReport(AnalysisResult result, AnalysisConfig config, Path outputDir, String outputFileName) {
-        String htmlFile = outputDir.resolve(outputFileName + getFileExtension()).toString();
-        List<FileInfo> files = result.getFileInfoList();
-        String projectName = result.getProjectName();
-        String projectType = result.getProjectType();
-        boolean lightMode = config.isLightMode();
-        Path projectPath = config.getProjectPath();
+  @Override
+  public void generateReport(
+      AnalysisResult result, AnalysisConfig config, Path outputDir, String outputFileName) {
+    String htmlFile = outputDir.resolve(outputFileName + getFileExtension()).toString();
+    List<FileInfo> files = result.getFileInfoList();
+    String projectName = result.getProjectName();
+    String projectType = result.getProjectType();
+    boolean lightMode = config.isLightMode();
+    Path projectPath = config.getProjectPath();
 
-        long maxContentSizeBytes = config.getMaxContentSizeBytes();
-        int maxLinesPerFile = config.getMaxLinesPerFile();
+    long maxContentSizeBytes = config.getMaxContentSizeBytes();
+    int maxLinesPerFile = config.getMaxLinesPerFile();
 
-        htmlGenerator.generate(files, projectName, projectType, lightMode, projectPath, htmlFile,
-                maxContentSizeBytes, maxLinesPerFile);
-    }
+    htmlGenerator.generate(
+        files,
+        projectName,
+        projectType,
+        lightMode,
+        projectPath,
+        htmlFile,
+        maxContentSizeBytes,
+        maxLinesPerFile);
+  }
 
-    @Override
-    public String getFileExtension() {
-        return ".html";
-    }
+  @Override
+  public String getFileExtension() {
+    return ".html";
+  }
 
-    @Override
-    public String getFormatDescription() {
-        return "HTML (.html) - для веб-просмотра";
-    }
+  @Override
+  public String getFormatDescription() {
+    return "HTML (.html) - для веб-просмотра";
+  }
 }
